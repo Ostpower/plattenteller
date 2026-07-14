@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plattenteller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
+<style>
+  :root{
+    --ink:#12141c;
+    --panel:#1c1f2b;
+    --panel-2:#242838;
+    --gold:#e8b44c;
+    --coral:#e8503a;
+    --cream:#f1eee6;
+    --slate:#a7acc2;
+    --groove:#0b0d13;
+    --green:#5fb98a;
+    --radius:16px;
+    --display: 'Bebas Neue', sans-serif;
+    --body: 'Space Grotesk', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --hand: 'Caveat', cursive;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(232,180,76,0.10), transparent 55%),
+      radial-gradient(ellipse at 100% 110%, rgba(232,80,58,0.10), transparent 50%),
+      var(--ink);
+    color:var(--cream);
+    font-family:var(--body);
+    min-height:100vh;
+    padding:28px 16px 60px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:720px; margin:0 auto;}
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin-bottom:6px;
+  }
+  h1.title{
+    font-family:var(--display);
+    font-size:clamp(40px,9vw,64px);
+    letter-spacing:0.01em;
+    line-height:0.9;
+    color:var(--cream);
+    margin-bottom:6px;
+  }
+  .subtitle{color:var(--slate); font-size:14.5px; margin-bottom:28px; max-width:52ch;}
+  .panel{
+    background:var(--panel);
+    border:1px solid rgba(255,255,255,0.06);
+    border-radius:var(--radius);
+    padding:22px;
+    margin-bottom:18px;
+  }
+  .panel h2{
+    font-family:var(--display);
+    font-size:22px;
+    letter-spacing:0.03em;
+    color:var(--cream);
+    margin-bottom:4px;
+  }
+  .panel .hint{color:var(--slate); font-size:13px; margin-bottom:16px; line-height:1.5;}
+  label{
+    display:block;
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--slate);
+    margin-bottom:6px;
+  }
+  input[type=text], input[type=password], input[type=number]{
+    width:100%;
+    background:var(--groove);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:10px;
+    padding:11px 13px;
+    color:var(--cream);
+    font-family:var(--body);
+    font-size:14.5px;
+    outline:none;
+    transition:border-color .15s;
+  }
+  input:focus{border-color:var(--gold);}
+  .row{display:flex; gap:10px;}
+  .row > *{flex:1;}
+  .field{margin-bottom:12px;}
+  button{
+    font-family:var(--body);
+    font-weight:600;
+    font-size:14px;
+    border:none;
+    border-radius:10px;
+    padding:11px 18px;
+    cursor:pointer;
+    transition:transform .1s, opacity .15s, background .15s, border-color .15s, color .15s;
+  }
+  button:active{transform:scale(0.97);}
+  button:disabled{opacity:0.35; cursor:not-allowed;}
+  .btn-gold{background:var(--gold); color:#241a06;}
+  .btn-gold:hover:not(:disabled){background:#f0c062;}
+  .btn-coral{background:var(--coral); color:#fff;}
+  .btn-coral:hover:not(:disabled){background:#f16a52;}
+  .btn-ghost{background:transparent; color:var(--cream); border:1px solid rgba(255,255,255,0.15);}
+  .btn-ghost:hover:not(:disabled){border-color:var(--gold); color:var(--gold);}
+  .btn-block{width:100%;}
+  .btn-sm{padding:7px 12px; font-size:12.5px; border-radius:8px;}
+
+  details.advanced{margin-top:16px; border-top:1px solid rgba(255,255,255,0.07); padding-top:14px;}
+  details.advanced summary{
+    cursor:pointer; font-family:var(--mono); font-size:11.5px; letter-spacing:0.08em;
+    text-transform:uppercase; color:var(--slate);
+  }
+  details.advanced summary:hover{color:var(--gold);}
+  details.advanced[open] summary{margin-bottom:12px;}
+
+  .chip-list{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}
+  .chip{
+    display:flex; align-items:center; gap:8px;
+    background:var(--groove);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:999px;
+    padding:6px 8px 6px 14px;
+    font-size:13.5px;
+  }
+  .chip button{
+    background:rgba(232,80,58,0.15); color:var(--coral);
+    border-radius:999px; width:20px; height:20px; padding:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; line-height:1;
+  }
+
+  .pick-chip{
+    background:var(--groove);
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:999px;
+    padding:8px 15px;
+    font-size:13px;
+    font-weight:500;
+    color:var(--cream);
+    cursor:pointer;
+  }
+  .pick-chip.selected{
+    background:rgba(232,180,76,0.15);
+    border-color:var(--gold);
+    color:var(--gold);
+    font-weight:600;
+  }
+  .pick-group{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;}
+
+  .connect-status{
+    display:flex; align-items:center; gap:8px;
+    font-family:var(--mono); font-size:12.5px; color:var(--slate);
+    margin-top:10px;
+  }
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--slate); flex-shrink:0;}
+  .dot.ok{background:var(--green);}
+  .dot.err{background:var(--coral);}
+
+  .track-item{
+    display:flex; align-items:center; gap:12px;
+    background:var(--groove);
+    border:1px solid rgba(255,255,255,0.07);
+    border-radius:12px;
+    padding:10px 12px;
+    margin-top:10px;
+  }
+  .track-item img{width:42px; height:42px; border-radius:6px; object-fit:cover; flex-shrink:0; background:#333;}
+  .track-item .placeholder-cover{
+    width:42px; height:42px; border-radius:6px; flex-shrink:0;
+    background:linear-gradient(135deg, var(--panel-2), var(--groove));
+    display:flex; align-items:center; justify-content:center;
+    color:var(--slate); font-size:16px;
+  }
+  .track-meta{flex:1; min-width:0;}
+  .track-meta .t{font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .track-meta .a{color:var(--slate); font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .track-count{
+    font-family:var(--mono); font-size:11px; color:var(--gold);
+    background:rgba(232,180,76,0.1); border-radius:999px;
+    padding:3px 10px; display:inline-block; margin-bottom:6px;
+  }
+
+  .scoreboard{display:flex; gap:10px; overflow-x:auto; overflow-y:visible; padding:8px 4px 14px; margin:-8px -4px 16px; -webkit-overflow-scrolling:touch;}
+  .score-chip{
+    flex-shrink:0;
+    background:linear-gradient(180deg, var(--panel), var(--panel) 60%, rgba(0,0,0,0.15));
+    border:2px solid rgba(255,255,255,0.06);
+    border-radius:16px;
+    padding:14px 22px 16px;
+    text-align:center;
+    min-width:128px;
+    position:relative;
+    transition: border-color .25s, background .25s, transform .2s;
+  }
+  .score-chip.active{
+    border-color:var(--coral);
+    background:linear-gradient(180deg, var(--panel-2), rgba(232,80,58,0.08));
+    transform:translateY(-2px);
+    box-shadow:0 8px 22px rgba(232,80,58,0.18);
+  }
+  .score-chip .turn-badge{
+    display:inline-block;
+    font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:0.1em;
+    color:#2a0f0a; background:var(--coral);
+    border-radius:999px; padding:3px 10px;
+    margin-bottom:8px;
+  }
+  .score-chip .name{
+    font-size:17px; color:var(--cream); font-weight:700; margin-bottom:6px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    display:flex; align-items:center; justify-content:center; gap:5px;
+  }
+  .score-chip.active .name{color:var(--cream);}
+  .score-chip .name .crown{font-size:15px;}
+  .score-chip .pts{font-family:var(--display); font-size:38px; letter-spacing:0.02em; line-height:1; color:var(--gold);}
+  .score-chip .pts::after{content:' PKT'; font-family:var(--mono); font-size:9px; color:var(--slate); letter-spacing:0.05em; vertical-align:3px;}
+
+  .stage{display:flex; flex-direction:column; align-items:center; padding:28px 20px 14px; position:relative;}
+
+  .deck-progress{width:100%; max-width:340px; margin-bottom:26px;}
+  .deck-progress-label{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-family:var(--mono); font-size:11px; font-weight:500; color:var(--slate); letter-spacing:0.08em;
+    margin-bottom:7px;
+  }
+  .deck-progress-label .num{color:var(--gold);}
+  .deck-progress-track{
+    height:5px; border-radius:999px; background:var(--groove);
+    overflow:hidden; box-shadow:inset 0 1px 2px rgba(0,0,0,0.4);
+  }
+  .deck-progress-fill{
+    height:100%; border-radius:999px;
+    background:linear-gradient(90deg, var(--coral), var(--gold));
+    transition: width .5s cubic-bezier(.4,0,.2,1);
+  }
+
+  .cassette-stage{
+    position:relative; width:280px; height:225px;
+    display:flex; align-items:flex-start; justify-content:center;
+    margin-bottom:8px;
+  }
+  .turntable-glow{
+    position:absolute; width:300px; height:220px; border-radius:24px;
+    background: radial-gradient(circle, rgba(232,180,76,0.18), rgba(232,80,58,0.08) 55%, transparent 75%);
+    opacity:0; transition: opacity .6s ease;
+    filter: blur(6px);
+  }
+  .cassette-stage.playing .turntable-glow{ opacity:1; animation: pulse-glow 2.6s ease-in-out infinite; }
+  @keyframes pulse-glow{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.035); } }
+
+  .cassette-assembly{
+    position:relative; width:280px; cursor:pointer;
+    transition: transform .25s ease;
+  }
+  .cassette-assembly:hover .cassette{ filter:brightness(1.03); }
+  .cassette-assembly:active .cassette{ filter:brightness(0.97); }
+  .cassette-stage.playing .cassette-assembly{ transform: translateY(-2px); }
+
+  .cassette-ground-shadow{
+    position:absolute; left:50%; bottom:-10px; transform:translateX(-50%);
+    width:76%; height:20px; border-radius:50%;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.5), transparent 72%);
+    transition: opacity .25s ease, width .25s ease;
+  }
+  .cassette-stage.playing .cassette-ground-shadow{ opacity:0.7; width:70%; }
+
+  .cassette{
+    position:relative; width:280px; height:auto;
+    background: linear-gradient(165deg, #f1ecdd 0%, #e2dac2 55%, #cec49f 100%);
+    border:1px solid rgba(60,50,30,0.22);
+    border-radius:9px 9px 4px 4px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.75),
+      inset 0 -10px 16px rgba(60,50,20,0.08),
+      0 1px 2px rgba(0,0,0,0.25),
+      0 16px 28px rgba(0,0,0,0.4);
+    padding:13px 15px 8px;
+    display:flex; flex-direction:column;
+  }
+  .cassette::after{
+    content:'';
+    position:absolute; inset:0; border-radius:9px 9px 4px 4px;
+    background: linear-gradient(120deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.12) 16%, transparent 30%);
+    pointer-events:none;
+  }
+  .cassette-screw{
+    position:absolute; width:8px; height:8px; border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #938a70, #4a4436 70%);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.45), 0 1px 1px rgba(255,255,255,0.4);
+    z-index:1;
+  }
+  .cassette-screw.tl{top:8px; left:8px;} .cassette-screw.tr{top:8px; right:8px;}
+  .cassette-screw.bl{bottom:8px; left:8px;} .cassette-screw.br{bottom:8px; right:8px;}
+
+  .cassette-label{
+    background:#f6f1e4;
+    border-radius:5px;
+    padding:8px 14px 5px;
+    margin:1px 6px 8px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+  }
+  .label-line{
+    border-bottom:1.5px solid #a7b4d6;
+    height:24px;
+    display:flex; align-items:flex-end;
+    padding-bottom:2px;
+  }
+  .label-line.ghost{ opacity:0.5; height:12px; }
+  .label-line span{
+    font-family:var(--hand); font-size:19px; font-weight:700;
+    color:#1c2340; line-height:1;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+    opacity:0; transform:translateY(4px);
+    transition: opacity .45s ease, transform .45s ease;
+  }
+  .label-line span.shown{ opacity:1; transform:translateY(0); }
+
+  .cassette-stripe{
+    background: linear-gradient(180deg, #e2543f, #d0402c);
+    border-radius:4px;
+    margin:0 4px 7px;
+    padding:7px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.25), inset 0 -1px 0 rgba(255,255,255,0.15);
+  }
+  .cassette-window{
+    height:46px;
+    background: linear-gradient(180deg, #0c0d12, #050506);
+    border-radius:4px;
+    position:relative;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 18px;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.8);
+    overflow:hidden;
+  }
+  .reel-wrap{ position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 18px; }
+  .reel{
+    position:relative;
+    width:34px; height:34px; border-radius:50%;
+    background: radial-gradient(circle, #d8dbe2 0%, #d8dbe2 28%, transparent 29%),
+                conic-gradient(#9aa0b0 0deg 30deg, transparent 30deg 60deg,
+                  #9aa0b0 60deg 90deg, transparent 90deg 120deg,
+                  #9aa0b0 120deg 150deg, transparent 150deg 180deg,
+                  #9aa0b0 180deg 210deg, transparent 210deg 240deg,
+                  #9aa0b0 240deg 270deg, transparent 270deg 300deg,
+                  #9aa0b0 300deg 330deg, transparent 330deg 360deg);
+    box-shadow: 0 0 0 2px #1a1b21, 0 2px 6px rgba(0,0,0,0.6);
+  }
+  .reel-hub{
+    position:absolute; width:11px; height:11px; border-radius:50%;
+    background:#14151a; margin:11.5px;
+    box-shadow: inset 0 0 0 2px #2a2c34;
+  }
+  .reel-wrap.spin .reel{ animation: spin 1.8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .tape-arc{
+    position:absolute; left:50%; top:6px; transform:translateX(-50%);
+    width:110px; height:14px;
+    border:2px solid #3a3d4a; border-top:none;
+    border-radius:0 0 55px 55px;
+    opacity:0.6;
+  }
+  .tap-hint{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:32px; height:32px; border-radius:50%;
+    background:rgba(0,0,0,0.4);
+    color:#f4efe2; font-size:12px;
+    display:flex; align-items:center; justify-content:center;
+    padding-left:2px;
+    opacity:0.9; transition:opacity .3s ease;
+    pointer-events:none; z-index:2;
+  }
+  .cassette-stage.playing .tap-hint{ opacity:0; }
+
+  .cassette-footer{
+    display:flex; align-items:center; gap:6px;
+    padding:7px 11px 0;
+    font-family:var(--mono); font-size:10px; letter-spacing:0.06em; color:#6b6455;
+  }
+  .brand-dot{width:6px; height:6px; border-radius:50%; background:var(--coral); flex-shrink:0; transition: background .2s ease;}
+  .brand-dot.is-playing{ background: var(--green); }
+  .brand-name{text-transform:uppercase; font-weight:700; color:#33301f; font-size:9px;}
+  .tape-type{margin-left:auto; color:var(--coral); font-weight:700;}
+
+  .cassette-tray{
+    position:relative; width:64%; height:22px; margin:1px auto 0;
+    background: linear-gradient(165deg, #e2dac2 0%, #cec49f 100%);
+    border:1px solid rgba(60,50,30,0.2); border-top:none;
+    clip-path: polygon(12% 0%, 88% 0%, 76% 100%, 24% 100%);
+    box-shadow: 0 8px 12px rgba(0,0,0,0.35);
+  }
+  .tray-slot{
+    position:absolute; top:5px; width:15px; height:5px; border-radius:2px;
+    background:#15161c; box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
+  }
+  .tray-slot.a{ left:26%; } .tray-slot.b{ right:26%; }
+  .tray-hole{
+    position:absolute; bottom:3px; width:7px; height:7px; border-radius:50%;
+    background:#15161c; box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
+  }
+  .tray-hole.a{ left:38%; } .tray-hole.b{ right:38%; }
+
+  .now-status{font-family:var(--mono); font-size:12px; color:var(--slate); letter-spacing:0.08em; min-height:16px; text-transform:uppercase; margin-top:18px;}
+
+
+  .guess-panel{width:100%; max-width:420px; margin-top:20px;}
+
+  .reveal-card{
+    display:flex; gap:14px; align-items:center;
+    background:var(--panel-2); border:1px solid rgba(232,180,76,0.25);
+    border-radius:14px; padding:14px; margin:18px 0;
+  }
+  .reveal-card img{width:64px; height:64px; border-radius:8px; object-fit:cover; background:#333;}
+  .reveal-card .rt{font-weight:700; font-size:16px;}
+  .reveal-card .ra{color:var(--slate); font-size:13.5px;}
+
+  .judge-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px;}
+  .judge-grid button{padding:12px 8px; font-size:13px;}
+
+  .empty-note{color:var(--slate); font-size:13px; font-style:italic; margin-top:8px;}
+
+  #spotify-embed-holder{
+    position:fixed; top:0; left:0; width:2px; height:2px;
+    overflow:hidden; opacity:0.01; pointer-events:none; z-index:-1;
+  }
+
+  .final-list{margin-top:10px;}
+  .final-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 16px; background:var(--groove); border-radius:10px; margin-bottom:8px;
+  }
+  .final-row .rank{font-family:var(--display); font-size:20px; color:var(--gold); width:28px;}
+  .final-row .fname{font-weight:600; flex:1;}
+  .final-row .fpts{font-family:var(--mono); font-size:14px; color:var(--slate);}
+  .final-row.winner{border:1px solid var(--gold); background:rgba(232,180,76,0.08);}
+
+  a.linkref{color:var(--gold);}
+
+  @media (max-width:420px){
+    .cassette-stage{width:240px; height:190px;}
+    .turntable-glow{width:260px; height:200px;}
+    .cassette-assembly, .cassette{width:240px;}
+    .cassette{height:148px;}
+    .reel{width:30px; height:30px;}
+    .label-line span{font-size:17px;}
+  }
+  .gate-overlay{
+    position:fixed; inset:0; z-index:1000;
+    background:var(--ink);
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  .gate-box{
+    width:100%; max-width:340px;
+    background:var(--panel);
+    border:1px solid rgba(255,255,255,0.06);
+    border-radius:var(--radius);
+    padding:28px 24px;
+    text-align:center;
+  }
+  .gate-box h1{
+    font-family:var(--display); font-size:38px; color:var(--cream); margin-bottom:6px; letter-spacing:0.01em;
+  }
+  .gate-box p{color:var(--slate); font-size:13.5px; margin-bottom:20px;}
+  .gate-box input{text-align:center; letter-spacing:0.1em; margin-bottom:10px;}
+  .gate-error{color:var(--coral); font-size:12.5px; min-height:16px; margin-top:2px;}
+</style>
+</head>
+<body>
+
+<div class="gate-overlay" id="gateOverlay">
+  <div class="gate-box">
+    <h1>Plattenteller</h1>
+    <p>Code eingeben, um zu spielen</p>
+    <input type="password" id="gatePasswordInput" placeholder="Zugangscode" autocomplete="off">
+    <button class="btn-gold btn-block" id="gateUnlockBtn">Los geht's</button>
+    <div class="gate-error" id="gateError"></div>
+  </div>
+</div>
+
+<div class="wrap" id="appWrap" style="display:none;">
+
+  <div class="eyebrow">Party-Musikquiz</div>
+  <h1 class="title">Plattenteller</h1>
+  <p class="subtitle">Song läuft, Cover bleibt verdeckt. Wer errät zuerst Titel &amp; Interpret?</p>
+
+  <div id="setup-screen">
+
+    <div class="panel">
+      <h2>1. Spotify verbinden</h2>
+      <p class="hint">
+        Einmalig einen kostenlosen Spotify-Entwickler-Zugang anlegen: <span class="linkref">developer.spotify.com/dashboard</span> → App erstellen (Redirect-URI ist für diesen Zweck egal, z.&nbsp;B. <span class="linkref">http://127.0.0.1:8000/callback</span> eintragen) → Client ID &amp; Client Secret kopieren und unten einfügen. Wird nur in diesem Browser gespeichert, nirgends sonst verschickt.
+      </p>
+      <div class="row">
+        <div class="field">
+          <label>Client ID</label>
+          <input type="text" id="clientIdInput" placeholder="Client ID einfügen">
+        </div>
+        <div class="field">
+          <label>Client Secret</label>
+          <input type="password" id="clientSecretInput" placeholder="Client Secret einfügen">
+        </div>
+      </div>
+      <div class="row" style="align-items:center; margin-bottom:4px;">
+        <label style="display:flex; align-items:center; gap:7px; margin:0; text-transform:none; font-family:var(--body); font-size:13px; color:var(--slate); flex:0 0 auto;">
+          <input type="checkbox" id="rememberMeInput" checked style="width:auto;"> in diesem Browser merken
+        </label>
+      </div>
+      <button class="btn-gold" id="connectBtn">Verbinden</button>
+      <div class="connect-status"><div class="dot" id="connectDot"></div><span id="connectText">Noch nicht verbunden</span></div>
+      <div class="empty-note"><a href="#" id="forgetCredsLink" class="linkref" style="text-decoration:underline;">Gespeicherte Zugangsdaten aus diesem Browser löschen</a></div>
+    </div>
+
+    <div class="panel" id="searchPanel" style="display:none;">
+      <h2>2. Songs finden</h2>
+      <p class="hint">Genre &amp; Jahrzehnt wählen (oder Freitextsuche), dann eine zufällige Auswahl aus dem Spotify-Katalog holen. Du siehst die Liste, aber nicht die Reihenfolge, in der sie im Spiel drankommen.</p>
+
+      <label>Genre</label>
+      <div class="pick-group" id="genreChips"></div>
+
+      <label>Jahrzehnt (optional)</label>
+      <div class="pick-group" id="decadeChips"></div>
+
+      <div class="row">
+        <div class="field">
+          <label>Anzahl Songs</label>
+          <input type="number" id="deckSizeInput" value="15" min="4" max="50">
+        </div>
+        <div class="field">
+          <label>Freitext (überschreibt Auswahl, optional)</label>
+          <input type="text" id="freeQueryInput" placeholder="z.B. Queen, oder eigener Suchbegriff">
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <button class="btn-coral" id="fetchTracksBtn">Songs laden</button>
+        <button class="btn-ghost" id="reshuffleBtn" style="display:none;">Andere Auswahl laden</button>
+      </div>
+      <div id="fetchStatus" class="empty-note"></div>
+
+      <div id="trackListWrap" style="margin-top:14px;">
+        <span class="track-count" id="trackCount" style="display:none;">0 Songs im Stapel</span>
+        <div id="trackList"></div>
+      </div>
+
+      <details class="advanced">
+        <summary>Einzelnen Song manuell per Link hinzufügen</summary>
+        <div class="field">
+          <label>Spotify-Track-Link</label>
+          <input type="text" id="trackUrlInput" placeholder="https://open.spotify.com/track/...">
+        </div>
+        <div class="row">
+          <div class="field"><label>Titel</label><input type="text" id="trackTitleInput" placeholder="wird ggf. automatisch ausgefüllt"></div>
+          <div class="field"><label>Interpret</label><input type="text" id="trackArtistInput" placeholder="Interpret eintragen"></div>
+        </div>
+        <button class="btn-ghost btn-block" id="addTrackBtn">+ Song manuell hinzufügen</button>
+      </details>
+    </div>
+
+    <div class="panel">
+      <h2>3. Spieler</h2>
+      <p class="hint">Wer spielt mit? Reihenfolge = Zugreihenfolge.</p>
+      <div class="row">
+        <input type="text" id="playerInput" placeholder="Name eingeben…" maxlength="18">
+        <button class="btn-gold" id="addPlayerBtn" style="flex:0 0 auto;">+ Hinzufügen</button>
+      </div>
+      <div class="chip-list" id="playerChips"></div>
+    </div>
+
+    <button class="btn-coral btn-block" id="startGameBtn" style="padding:15px; font-size:15px;" disabled>Spiel starten</button>
+  </div>
+
+  <div id="game-screen" style="display:none;">
+    <div class="scoreboard" id="scoreboard"></div>
+
+    <div class="panel stage">
+      <div class="deck-progress">
+        <div class="deck-progress-label">
+          <span>SONG <span class="num" id="deckCurrent">1</span> / <span id="deckTotal">10</span></span>
+          <span id="deckRemainingLabel">9 danach übrig</span>
+        </div>
+        <div class="deck-progress-track"><div class="deck-progress-fill" id="deckProgressFill" style="width:0%;"></div></div>
+      </div>
+
+      <div class="cassette-stage" id="turntableStage">
+        <div class="turntable-glow"></div>
+        <div class="cassette-assembly" id="cassette" role="button" aria-label="Play/Pause" tabindex="0">
+          <div class="cassette-ground-shadow"></div>
+          <div class="cassette">
+            <div class="cassette-screw tl"></div>
+            <div class="cassette-screw tr"></div>
+            <div class="cassette-screw bl"></div>
+            <div class="cassette-screw br"></div>
+
+            <div class="cassette-label">
+              <div class="label-line" id="labelLine1"><span id="labelTitle"></span></div>
+              <div class="label-line" id="labelLine2"><span id="labelArtist"></span></div>
+              <div class="label-line ghost"></div>
+            </div>
+
+            <div class="cassette-stripe">
+              <div class="cassette-window">
+                <div class="reel-wrap" id="vinyl">
+                  <div class="reel left"><div class="reel-hub"></div></div>
+                  <div class="reel right"><div class="reel-hub"></div></div>
+                  <div class="tape-arc"></div>
+                </div>
+                <div class="tap-hint" id="tapHint">▶</div>
+              </div>
+            </div>
+
+            <div class="cassette-footer">
+              <span class="brand-dot" id="brandDot"></span>
+              <span class="brand-name">plattenteller</span>
+              <span class="tape-type">LN 90</span>
+            </div>
+          </div>
+          <div class="cassette-tray">
+            <div class="tray-slot a"></div>
+            <div class="tray-hole a"></div>
+            <div class="tray-hole b"></div>
+            <div class="tray-slot b"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="now-status" id="nowStatus">Bereit — Kassette antippen</div>
+
+      <div class="guess-panel" id="guessPanel">
+        <div class="field"><label>Tipp: Titel</label><input type="text" id="guessTitle" placeholder="Songtitel…"></div>
+        <div class="field"><label>Tipp: Interpret</label><input type="text" id="guessArtist" placeholder="Interpret…"></div>
+        <button class="btn-gold btn-block" id="revealBtn">Aufdecken</button>
+      </div>
+
+      <div class="guess-panel" id="revealPanel" style="display:none;">
+        <div class="reveal-card">
+          <img id="revealCover" src="" alt="" style="display:none;">
+          <div id="revealCoverPlaceholder" class="placeholder-cover" style="width:64px;height:64px;">♪</div>
+          <div>
+            <div class="rt" id="revealTitle"></div>
+            <div class="ra" id="revealArtist"></div>
+          </div>
+        </div>
+        <label>Wer war dran: <span id="revealPlayerName" style="color:var(--gold);"></span> — wie bewerten?</label>
+        <div class="judge-grid">
+          <button class="btn-ghost" data-score="2" id="judgeBoth">Beides richtig (+2)</button>
+          <button class="btn-ghost" data-score="1a">Nur Titel (+1)</button>
+          <button class="btn-ghost" data-score="1b">Nur Interpret (+1)</button>
+          <button class="btn-ghost" data-score="0">Nichts richtig</button>
+        </div>
+        <button class="btn-coral btn-block" id="nextRoundBtn" style="margin-top:14px;">Nächster Song →</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="end-screen" style="display:none;">
+    <div class="panel">
+      <h2>Spiel vorbei 🏁</h2>
+      <p class="hint">Der Stapel ist leer. Endstand:</p>
+      <div class="final-list" id="finalList"></div>
+      <button class="btn-gold btn-block" id="restartBtn" style="margin-top:16px;">Neues Spiel</button>
+    </div>
+  </div>
+
+  <div id="spotify-embed-holder"><div id="spotify-embed"></div></div>
+</div>
+
+<script>
+(function(){
+  // ---------- SIMPLE PASSWORD GATE ----------
+  // Change this to whatever code you want people to enter. This is NOT real security —
+  // just a simple lock to keep casual visitors out. Anyone who views the page source can see it.
+  const APP_PASSWORD = 'Leipzig';
+  const GATE_STORAGE_KEY = 'plattenteller_gate_unlocked';
+
+  const gateOverlay = document.getElementById('gateOverlay');
+  const appWrap = document.getElementById('appWrap');
+  const gatePasswordInput = document.getElementById('gatePasswordInput');
+  const gateUnlockBtn = document.getElementById('gateUnlockBtn');
+  const gateError = document.getElementById('gateError');
+
+  function unlockApp(){
+    gateOverlay.style.display = 'none';
+    appWrap.style.display = 'block';
+  }
+
+  try{
+    if(localStorage.getItem(GATE_STORAGE_KEY) === 'yes'){
+      unlockApp();
+    }
+  }catch(e){ /* localStorage unavailable, gate stays shown */ }
+
+  function tryUnlock(){
+    if(gatePasswordInput.value === APP_PASSWORD){
+      try{ localStorage.setItem(GATE_STORAGE_KEY, 'yes'); }catch(e){}
+      unlockApp();
+    }else{
+      gateError.textContent = 'Falscher Code, nochmal versuchen.';
+      gatePasswordInput.value = '';
+      gatePasswordInput.focus();
+    }
+  }
+  gateUnlockBtn.addEventListener('click', tryUnlock);
+  gatePasswordInput.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); tryUnlock(); }});
+})();
+</script>
+<script>
+(function(){
+  let players = [];
+  let tracks = [];
+  let deck = [];
+  let currentPlayerIdx = 0;
+  let currentTrackId = null;
+  let isPlaying = false;
+
+  let spotifyIFrameAPI = null;
+  let controller = null;
+  let controllerReady = false;
+
+  let accessToken = null;
+  let tokenExpiresAt = 0;
+  let clientId = '';
+  let clientSecret = '';
+
+  window.onSpotifyIframeApiReady = (IFrameAPI) => { spotifyIFrameAPI = IFrameAPI; };
+
+  function ensureController(initialUri, cb){
+    if(controller){ controller.loadUri(initialUri); cb && cb(); return; }
+    if(!spotifyIFrameAPI){ setTimeout(()=>ensureController(initialUri, cb), 300); return; }
+    const element = document.getElementById('spotify-embed');
+    spotifyIFrameAPI.createController(element, { uri: initialUri, width: '100', height: '80' }, (EmbedController) => {
+      controller = EmbedController;
+      controller.addListener('ready', () => {
+        if(controllerReady) return; // guard: 'ready' can fire again later, only act on the first time
+        controllerReady = true;
+        console.log('Spotify embed controller ready');
+        cb && cb();
+      });
+      controller.addListener('playback_update', (e) => {
+        isPlaying = !e.data.isPaused;
+        updateTransportUI();
+      });
+    });
+  }
+
+  function extractTrackId(url){
+    const m = url.match(/track\/([a-zA-Z0-9]+)/);
+    return m ? m[1] : null;
+  }
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; }
+    return a;
+  }
+  function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  function normalize(s){ return (s||'').toLowerCase().trim().replace(/[^a-z0-9äöüß\s]/gi,'').replace(/\s+/g,' '); }
+
+  // ---------- SPOTIFY AUTH (client credentials, app-only, no user login) ----------
+  const clientIdInput = document.getElementById('clientIdInput');
+  const clientSecretInput = document.getElementById('clientSecretInput');
+  const rememberMeInput = document.getElementById('rememberMeInput');
+  const connectBtn = document.getElementById('connectBtn');
+  const connectDot = document.getElementById('connectDot');
+  const connectText = document.getElementById('connectText');
+  const searchPanel = document.getElementById('searchPanel');
+
+  // Restore remembered credentials, if any, and try to connect automatically
+  try{
+    const saved = localStorage.getItem('plattenteller_spotify_creds');
+    if(saved){
+      const parsed = JSON.parse(saved);
+      clientIdInput.value = parsed.clientId || '';
+      clientSecretInput.value = parsed.clientSecret || '';
+      if(parsed.clientId && parsed.clientSecret){
+        connectText.textContent = 'Gespeicherte Zugangsdaten gefunden — verbinde automatisch…';
+        setTimeout(() => connectBtn.click(), 50);
+      }
+    }
+  }catch(e){ /* localStorage unavailable, ignore */ }
+
+  async function fetchToken(){
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + btoa(clientId + ':' + clientSecret)
+      },
+      body: 'grant_type=client_credentials'
+    });
+    if(!res.ok){
+      let detail = '';
+      try{ const errJson = await res.json(); detail = errJson.error_description || errJson.error || ''; }catch(e2){}
+      throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : ''));
+    }
+    const data = await res.json();
+    accessToken = data.access_token;
+    tokenExpiresAt = Date.now() + (data.expires_in * 1000);
+  }
+
+  connectBtn.onclick = async () => {
+    clientId = clientIdInput.value.trim();
+    clientSecret = clientSecretInput.value.trim();
+    if(!clientId || !clientSecret){
+      connectText.textContent = 'Bitte Client ID und Client Secret eintragen.';
+      connectDot.className = 'dot err';
+      return;
+    }
+    connectText.textContent = 'Verbinde…';
+    connectDot.className = 'dot';
+    try{
+      await fetchToken();
+      connectText.textContent = 'Verbunden ✓ — Token wird automatisch erneuert';
+      connectDot.className = 'dot ok';
+      searchPanel.style.display = 'block';
+      if(rememberMeInput.checked){
+        try{ localStorage.setItem('plattenteller_spotify_creds', JSON.stringify({clientId, clientSecret})); }catch(e){}
+      }else{
+        try{ localStorage.removeItem('plattenteller_spotify_creds'); }catch(e){}
+      }
+    }catch(err){
+      connectText.textContent = 'Fehler: ' + err.message + ' — Client ID/Secret prüfen (siehe Konsole F12 für Details).';
+      connectDot.className = 'dot err';
+      console.error('Spotify connect error:', err);
+    }
+  };
+
+  async function ensureFreshToken(){
+    if(accessToken && Date.now() < tokenExpiresAt - 30000) return true;
+    if(!clientId || !clientSecret) return false;
+    try{ await fetchToken(); return true; }
+    catch(err){ console.error('Silent token refresh failed:', err); return false; }
+  }
+
+  document.getElementById('forgetCredsLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    try{ localStorage.removeItem('plattenteller_spotify_creds'); }catch(err){}
+    clientIdInput.value = '';
+    clientSecretInput.value = '';
+    accessToken = null;
+    clientId = ''; clientSecret = '';
+    connectText.textContent = 'Zugangsdaten gelöscht.';
+    connectDot.className = 'dot';
+    searchPanel.style.display = 'none';
+  });
+
+  // ---------- GENRE / DECADE PICKERS ----------
+  const GENRES = ['Rock','Pop','Hip-Hop','Electronic','Indie','Metal','Jazz','Deutschrap','Schlager','Punk','R&B','Reggae','Klassik','Country'];
+  const DECADES = [
+    {label:'60er', range:'1960-1969'}, {label:'70er', range:'1970-1979'},
+    {label:'80er', range:'1980-1989'}, {label:'90er', range:'1990-1999'},
+    {label:'2000er', range:'2000-2009'}, {label:'2010er', range:'2010-2019'},
+    {label:'2020er', range:'2020-2029'}
+  ];
+  let selectedGenre = null;
+  let selectedDecade = null;
+
+  const genreChipsEl = document.getElementById('genreChips');
+  GENRES.forEach(g => {
+    const c = document.createElement('div');
+    c.className = 'pick-chip';
+    c.textContent = g;
+    c.onclick = () => {
+      selectedGenre = (selectedGenre === g) ? null : g;
+      [...genreChipsEl.children].forEach(ch => ch.classList.toggle('selected', ch.textContent === selectedGenre));
+    };
+    genreChipsEl.appendChild(c);
+  });
+
+  const decadeChipsEl = document.getElementById('decadeChips');
+  DECADES.forEach(d => {
+    const c = document.createElement('div');
+    c.className = 'pick-chip';
+    c.textContent = d.label;
+    c.onclick = () => {
+      selectedDecade = (selectedDecade === d.range) ? null : d.range;
+      [...decadeChipsEl.children].forEach(ch => ch.classList.toggle('selected', ch.textContent === (DECADES.find(x=>x.range===selectedDecade)||{}).label));
+    };
+    decadeChipsEl.appendChild(c);
+  });
+
+  // ---------- SEARCH & BUILD DECK ----------
+  const deckSizeInput = document.getElementById('deckSizeInput');
+  const freeQueryInput = document.getElementById('freeQueryInput');
+  const fetchTracksBtn = document.getElementById('fetchTracksBtn');
+  const reshuffleBtn = document.getElementById('reshuffleBtn');
+  const fetchStatus = document.getElementById('fetchStatus');
+  const trackList = document.getElementById('trackList');
+  const trackCount = document.getElementById('trackCount');
+
+  let lastSearchQuery = '';
+
+  fetchTracksBtn.onclick = () => runSearch(true);
+  reshuffleBtn.onclick = () => runSearch(false);
+
+  async function runSearch(isFirst){
+    if(!clientId || !clientSecret){ fetchStatus.textContent = 'Nicht verbunden — bitte oben zuerst mit Spotify verbinden.'; return; }
+    const ok = await ensureFreshToken();
+    if(!ok){ fetchStatus.textContent = 'Verbindung zu Spotify fehlgeschlagen — Client ID/Secret prüfen.'; return; }
+
+    let query = freeQueryInput.value.trim();
+    if(!query){
+      const parts = [];
+      if(selectedGenre) parts.push('genre:"' + selectedGenre.toLowerCase() + '"');
+      if(selectedDecade) parts.push('year:' + selectedDecade);
+      query = parts.join(' ');
+    }
+    if(!query){ fetchStatus.textContent = 'Bitte ein Genre/Jahrzehnt wählen oder Freitext eingeben.'; return; }
+    lastSearchQuery = query;
+
+    fetchStatus.textContent = 'Suche Songs…';
+    try{
+      const desired = Math.max(4, Math.min(50, parseInt(deckSizeInput.value) || 15));
+      const maxPerArtist = 2;
+      const perCall = 10; // Spotify's search endpoint only allows limit 0-10
+      const maxOffset = 390; // wider slice of results so enough distinct artists are reachable
+      const maxCalls = 30; // hard ceiling so we never hammer the API endlessly
+      const seenIds = new Set();
+      const usedOffsets = new Set();
+      const collected = [];
+
+      function pickWithArtistCap(pool, count){
+        const artistCount = {};
+        const result = [];
+        for(const t of shuffle(pool)){
+          const key = (t.artists && t.artists[0] && t.artists[0].id) ? t.artists[0].id : t.artists.map(a=>a.name).join(',');
+          const used = artistCount[key] || 0;
+          if(used >= maxPerArtist) continue;
+          artistCount[key] = used + 1;
+          result.push(t);
+          if(result.length >= count) break;
+        }
+        return result;
+      }
+
+      let picked = [];
+      for(let i = 0; i < maxCalls; i++){
+        let offset;
+        do{ offset = Math.floor(Math.random() * (maxOffset / 10 + 1)) * 10; } while(usedOffsets.has(offset) && usedOffsets.size < (maxOffset/10 + 1));
+        usedOffsets.add(offset);
+
+        let res = await fetch('https://api.spotify.com/v1/search?q=' + encodeURIComponent(query) + '&type=track&limit=' + perCall + '&offset=' + offset + '&market=DE', {
+          headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+        if(res.status === 401){
+          const refreshed = await ensureFreshToken();
+          if(!refreshed){ fetchStatus.textContent = 'Verbindung zu Spotify verloren — bitte oben erneut verbinden.'; return; }
+          res = await fetch('https://api.spotify.com/v1/search?q=' + encodeURIComponent(query) + '&type=track&limit=' + perCall + '&offset=' + offset + '&market=DE', {
+            headers: { 'Authorization': 'Bearer ' + accessToken }
+          });
+        }
+        if(!res.ok){
+          let detail = '';
+          try{ const errJson = await res.json(); detail = errJson.error && errJson.error.message ? errJson.error.message : ''; }catch(e2){}
+          throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + ' (Query: ' + query + ')');
+        }
+        const data = await res.json();
+        const items = (data.tracks && data.tracks.items) ? data.tracks.items.filter(t => t && t.id) : [];
+        let addedAny = false;
+        items.forEach(t => { if(!seenIds.has(t.id)){ seenIds.add(t.id); collected.push(t); addedAny = true; } });
+
+        picked = pickWithArtistCap(collected, desired);
+        if(picked.length >= desired) break;
+        if(!addedAny && data.tracks && (offset + perCall) >= data.tracks.total) break; // exhausted this query's results
+        fetchStatus.textContent = 'Suche Songs… (' + picked.length + '/' + desired + ', max. ' + maxPerArtist + ' je Interpret)';
+      }
+
+      if(collected.length === 0){
+        fetchStatus.textContent = 'Keine Songs gefunden — andere Auswahl probieren.';
+        return;
+      }
+      if(picked.length < desired){
+        fetchStatus.textContent = 'Nur ' + picked.length + ' von ' + desired + ' Songs gefunden (mit max. ' + maxPerArtist + ' je Interpret) — Auswahl/Genre evtl. zu eng. Trotzdem geladen.';
+      }
+      tracks = picked.map(t => ({
+        id: t.id,
+        uri: t.uri,
+        title: t.name,
+        artist: t.artists.map(a => a.name).join(', '),
+        cover: (t.album && t.album.images && t.album.images.length) ? t.album.images[t.album.images.length > 2 ? 1 : 0].url : ''
+      }));
+      if(picked.length >= desired){
+        fetchStatus.textContent = tracks.length + ' Songs geladen für: ' + query + ' (max. ' + maxPerArtist + ' je Interpret)';
+      }
+      reshuffleBtn.style.display = 'inline-block';
+      renderTracks();
+      checkStart();
+    }catch(err){
+      fetchStatus.textContent = 'Fehler: ' + err.message + ' — siehe Konsole (F12) für Details.';
+      console.error('Spotify search error:', err);
+    }
+  }
+
+  // ---------- MANUAL ADD (fallback) ----------
+  const trackUrlInput = document.getElementById('trackUrlInput');
+  const trackTitleInput = document.getElementById('trackTitleInput');
+  const trackArtistInput = document.getElementById('trackArtistInput');
+  const addTrackBtn = document.getElementById('addTrackBtn');
+  let lastFetchedCover = '';
+
+  trackUrlInput.addEventListener('blur', tryAutoFetch);
+  async function tryAutoFetch(){
+    const url = trackUrlInput.value.trim();
+    const id = extractTrackId(url);
+    if(!id) return;
+    lastFetchedCover = '';
+    try{
+      const res = await fetch('https://open.spotify.com/oembed?url=' + encodeURIComponent('https://open.spotify.com/track/' + id));
+      if(!res.ok) throw new Error('no oembed');
+      const data = await res.json();
+      if(data.title && !trackTitleInput.value) trackTitleInput.value = data.title;
+      if(data.thumbnail_url) lastFetchedCover = data.thumbnail_url;
+    }catch(err){ /* silent fallback to manual entry */ }
+  }
+
+  addTrackBtn.onclick = () => {
+    const url = trackUrlInput.value.trim();
+    const id = extractTrackId(url);
+    if(!id){ fetchStatus.textContent = 'Das sieht nicht nach einem gültigen open.spotify.com/track/-Link aus.'; return; }
+    const title = trackTitleInput.value.trim() || 'Unbekannter Titel';
+    const artist = trackArtistInput.value.trim() || 'Unbekannter Interpret';
+    tracks.push({ id, uri: 'spotify:track:' + id, title, artist, cover: lastFetchedCover });
+    trackUrlInput.value = ''; trackTitleInput.value = ''; trackArtistInput.value = '';
+    lastFetchedCover = '';
+    renderTracks();
+    checkStart();
+  };
+
+  function renderTracks(){
+    trackCount.style.display = tracks.length ? 'inline-block' : 'none';
+    trackCount.textContent = tracks.length + (tracks.length===1 ? ' Song im Stapel' : ' Songs im Stapel');
+    trackList.innerHTML = '';
+    tracks.forEach((t,i) => {
+      const item = document.createElement('div');
+      item.className = 'track-item';
+      item.innerHTML = `
+        ${t.cover ? `<img src="${t.cover}" alt="">` : `<div class="placeholder-cover">♪</div>`}
+        <div class="track-meta">
+          <div class="t">${escapeHtml(t.title)}</div>
+          <div class="a">${escapeHtml(t.artist)}</div>
+        </div>
+      `;
+      const rm = document.createElement('button');
+      rm.className = 'btn-ghost btn-sm';
+      rm.textContent = 'Entfernen';
+      rm.onclick = () => { tracks.splice(i,1); renderTracks(); checkStart(); };
+      item.appendChild(rm);
+      trackList.appendChild(item);
+    });
+  }
+
+  // ---------- PLAYERS ----------
+  const playerInput = document.getElementById('playerInput');
+  const addPlayerBtn = document.getElementById('addPlayerBtn');
+  const playerChips = document.getElementById('playerChips');
+  const startGameBtn = document.getElementById('startGameBtn');
+
+  function renderPlayers(){
+    playerChips.innerHTML = '';
+    players.forEach((p, i) => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.innerHTML = `<span>${escapeHtml(p.name)}</span>`;
+      const rm = document.createElement('button');
+      rm.textContent = '×';
+      rm.onclick = () => { players.splice(i,1); renderPlayers(); checkStart(); };
+      chip.appendChild(rm);
+      playerChips.appendChild(chip);
+    });
+  }
+  function addPlayer(){
+    const name = playerInput.value.trim();
+    if(!name) return;
+    players.push({name, score:0});
+    playerInput.value = '';
+    renderPlayers();
+    checkStart();
+  }
+  addPlayerBtn.onclick = addPlayer;
+  playerInput.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); addPlayer(); }});
+
+  function checkStart(){ startGameBtn.disabled = !(players.length >= 1 && tracks.length >= 1); }
+
+  // ---------- GAME FLOW ----------
+  const setupScreen = document.getElementById('setup-screen');
+  const gameScreen = document.getElementById('game-screen');
+  const endScreen = document.getElementById('end-screen');
+  const scoreboard = document.getElementById('scoreboard');
+  const deckCurrentEl = document.getElementById('deckCurrent');
+  const deckTotalEl = document.getElementById('deckTotal');
+  const deckRemainingLabel = document.getElementById('deckRemainingLabel');
+  const deckProgressFill = document.getElementById('deckProgressFill');
+  const turntableStage = document.getElementById('turntableStage');
+  const vinyl = document.getElementById('vinyl');
+  const labelTitle = document.getElementById('labelTitle');
+  const labelArtist = document.getElementById('labelArtist');
+  const cassetteEl = document.getElementById('cassette');
+  const brandDot = document.getElementById('brandDot');
+  const nowStatus = document.getElementById('nowStatus');
+  const guessPanel = document.getElementById('guessPanel');
+  const revealPanel = document.getElementById('revealPanel');
+  const revealBtn = document.getElementById('revealBtn');
+  const guessTitle = document.getElementById('guessTitle');
+  const guessArtist = document.getElementById('guessArtist');
+  const revealCover = document.getElementById('revealCover');
+  const revealCoverPlaceholder = document.getElementById('revealCoverPlaceholder');
+  const revealTitle = document.getElementById('revealTitle');
+  const revealArtist = document.getElementById('revealArtist');
+  const revealPlayerName = document.getElementById('revealPlayerName');
+  const nextRoundBtn = document.getElementById('nextRoundBtn');
+
+  let totalDeckSize = 0;
+
+  startGameBtn.onclick = () => {
+    deck = shuffle(tracks.map((_,i)=>i));
+    totalDeckSize = deck.length;
+    currentPlayerIdx = 0;
+    setupScreen.style.display = 'none';
+    gameScreen.style.display = 'block';
+    endScreen.style.display = 'none';
+    loadNextTrack();
+    renderScoreboard();
+  };
+
+  function renderScoreboard(){
+    scoreboard.innerHTML = '';
+    const maxScore = Math.max(0, ...players.map(p => p.score));
+    players.forEach((p,i) => {
+      const isLeader = p.score > 0 && p.score === maxScore;
+      const isActive = i === currentPlayerIdx;
+      const chip = document.createElement('div');
+      chip.className = 'score-chip' + (isActive ? ' active' : '');
+      chip.innerHTML = `
+        <div class="turn-badge" style="${isActive ? '' : 'visibility:hidden;'}">Am Zug</div>
+        <div class="name">${escapeHtml(p.name)}${isLeader ? ' <span class="crown">👑</span>' : ''}</div>
+        <div class="pts">${p.score}</div>
+      `;
+      scoreboard.appendChild(chip);
+    });
+  }
+
+  function loadNextTrack(){
+    if(deck.length === 0){ showEndScreen(); return; }
+    const trackIdx = deck.pop();
+    currentTrackId = trackIdx;
+    const t = tracks[trackIdx];
+
+    const songNumber = totalDeckSize - deck.length;
+    deckCurrentEl.textContent = songNumber;
+    deckTotalEl.textContent = totalDeckSize;
+    deckRemainingLabel.textContent = deck.length === 0 ? 'letzter Song' : deck.length + ' danach übrig';
+    deckProgressFill.style.width = Math.round((songNumber / totalDeckSize) * 100) + '%';
+
+    labelTitle.textContent = ''; labelTitle.classList.remove('shown');
+    labelArtist.textContent = ''; labelArtist.classList.remove('shown');
+    vinyl.classList.remove('spin');
+    turntableStage.classList.remove('playing');
+    isPlaying = false;
+    brandDot.classList.remove('is-playing');
+    nowStatus.textContent = 'Bereit — Kassette antippen';
+    guessTitle.value = ''; guessArtist.value = '';
+    guessPanel.style.display = 'block';
+    revealPanel.style.display = 'none';
+
+    ensureController(t.uri, () => {});
+  }
+
+  function updateTransportUI(){
+    vinyl.classList.toggle('spin', isPlaying);
+    turntableStage.classList.toggle('playing', isPlaying);
+    brandDot.classList.toggle('is-playing', isPlaying);
+    nowStatus.textContent = isPlaying ? 'Läuft…' : 'Pausiert';
+  }
+
+  let lastToggleAt = 0;
+  function togglePlayback(){
+    if(!controller){ console.warn('Play clicked but no controller yet'); return; }
+    const now = Date.now();
+    if(now - lastToggleAt < 250) return; // guard against double-fire (e.g. click + synthesized keyboard click)
+    lastToggleAt = now;
+    console.log('Toggling playback, currently playing:', isPlaying);
+    if(isPlaying){ controller.pause(); } else { controller.play(); }
+  }
+  cassetteEl.addEventListener('click', togglePlayback);
+  cassetteEl.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); e.stopPropagation(); togglePlayback(); }
+  });
+
+  revealBtn.onclick = () => {
+    if(controller) controller.pause();
+    const t = tracks[currentTrackId];
+    guessPanel.style.display = 'none';
+    revealPanel.style.display = 'block';
+    revealPlayerName.textContent = players[currentPlayerIdx].name;
+    revealTitle.textContent = t.title;
+    revealArtist.textContent = t.artist;
+    if(t.cover){
+      revealCover.src = t.cover; revealCover.style.display = 'block';
+      revealCoverPlaceholder.style.display = 'none';
+    }else{
+      revealCover.style.display = 'none';
+      revealCoverPlaceholder.style.display = 'flex';
+    }
+    labelTitle.textContent = t.title;
+    labelArtist.textContent = t.artist;
+    requestAnimationFrame(() => {
+      labelTitle.classList.add('shown');
+      setTimeout(() => labelArtist.classList.add('shown'), 180);
+    });
+    const guessedTitle = normalize(guessTitle.value);
+    const guessedArtist = normalize(guessArtist.value);
+    const realTitle = normalize(t.title);
+    const realArtist = normalize(t.artist);
+    document.getElementById('judgeBoth').style.borderColor =
+      (guessedTitle && realTitle.includes(guessedTitle)) && (guessedArtist && realArtist.includes(guessedArtist))
+        ? 'var(--gold)' : 'rgba(255,255,255,0.15)';
+  };
+
+  document.querySelectorAll('.judge-grid button[data-score]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.getAttribute('data-score');
+      let pts = 0;
+      if(val === '2') pts = 2; else if(val === '1a' || val === '1b') pts = 1;
+      players[currentPlayerIdx].score += pts;
+      renderScoreboard();
+    });
+  });
+
+  nextRoundBtn.onclick = () => {
+    currentPlayerIdx = (currentPlayerIdx + 1) % players.length;
+    renderScoreboard();
+    loadNextTrack();
+  };
+
+  function showEndScreen(){
+    gameScreen.style.display = 'none';
+    endScreen.style.display = 'block';
+    const finalList = document.getElementById('finalList');
+    const sorted = players.slice().sort((a,b)=>b.score-a.score);
+    finalList.innerHTML = '';
+    sorted.forEach((p,i) => {
+      const row = document.createElement('div');
+      row.className = 'final-row' + (i===0 ? ' winner' : '');
+      row.innerHTML = `
+        <div class="rank">${i+1}</div>
+        <div class="fname">${escapeHtml(p.name)}${i===0 ? ' 👑' : ''}</div>
+        <div class="fpts">${p.score} Pkt.</div>
+      `;
+      finalList.appendChild(row);
+    });
+  }
+
+  document.getElementById('restartBtn').onclick = () => {
+    players.forEach(p => p.score = 0);
+    endScreen.style.display = 'none';
+    setupScreen.style.display = 'block';
+  };
+
+})();
+</script>
+</body>
+</html>
