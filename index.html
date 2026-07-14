@@ -497,28 +497,8 @@
   <div id="setup-screen">
 
     <div class="panel">
-      <h2>1. Spotify verbinden</h2>
-      <p class="hint">
-        Einmalig einen kostenlosen Spotify-Entwickler-Zugang anlegen: <span class="linkref">developer.spotify.com/dashboard</span> → App erstellen (Redirect-URI ist für diesen Zweck egal, z.&nbsp;B. <span class="linkref">http://127.0.0.1:8000/callback</span> eintragen) → Client ID &amp; Client Secret kopieren und unten einfügen. Wird nur in diesem Browser gespeichert, nirgends sonst verschickt.
-      </p>
-      <div class="row">
-        <div class="field">
-          <label>Client ID</label>
-          <input type="text" id="clientIdInput" placeholder="Client ID einfügen">
-        </div>
-        <div class="field">
-          <label>Client Secret</label>
-          <input type="password" id="clientSecretInput" placeholder="Client Secret einfügen">
-        </div>
-      </div>
-      <div class="row" style="align-items:center; margin-bottom:4px;">
-        <label style="display:flex; align-items:center; gap:7px; margin:0; text-transform:none; font-family:var(--body); font-size:13px; color:var(--slate); flex:0 0 auto;">
-          <input type="checkbox" id="rememberMeInput" checked style="width:auto;"> in diesem Browser merken
-        </label>
-      </div>
-      <button class="btn-gold" id="connectBtn">Verbinden</button>
-      <div class="connect-status"><div class="dot" id="connectDot"></div><span id="connectText">Noch nicht verbunden</span></div>
-      <div class="empty-note"><a href="#" id="forgetCredsLink" class="linkref" style="text-decoration:underline;">Gespeicherte Zugangsdaten aus diesem Browser löschen</a></div>
+      <h2>Spotify</h2>
+      <div class="connect-status"><div class="dot" id="connectDot"></div><span id="connectText">Verbinde mit Spotify…</span></div>
     </div>
 
     <div class="panel" id="searchPanel" style="display:none;">
@@ -729,8 +709,10 @@
 
   let accessToken = null;
   let tokenExpiresAt = 0;
-  let clientId = '';
-  let clientSecret = '';
+  // Fest hinterlegte Spotify-Zugangsdaten — hier deine eigenen Werte eintragen,
+  // damit niemand mehr Client ID/Secret manuell eingeben muss.
+  let clientId = 'D96426600438a4e27a76fd24f62f345a2';
+  let clientSecret = 'a9629e01ff26436699908680aa9d821b';
 
   window.onSpotifyIframeApiReady = (IFrameAPI) => { spotifyIFrameAPI = IFrameAPI; };
 
@@ -765,28 +747,10 @@
   function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
   function normalize(s){ return (s||'').toLowerCase().trim().replace(/[^a-z0-9äöüß\s]/gi,'').replace(/\s+/g,' '); }
 
-  // ---------- SPOTIFY AUTH (client credentials, app-only, no user login) ----------
-  const clientIdInput = document.getElementById('clientIdInput');
-  const clientSecretInput = document.getElementById('clientSecretInput');
-  const rememberMeInput = document.getElementById('rememberMeInput');
-  const connectBtn = document.getElementById('connectBtn');
+  // ---------- SPOTIFY AUTH (client credentials, hardcoded — connects automatically) ----------
   const connectDot = document.getElementById('connectDot');
   const connectText = document.getElementById('connectText');
   const searchPanel = document.getElementById('searchPanel');
-
-  // Restore remembered credentials, if any, and try to connect automatically
-  try{
-    const saved = localStorage.getItem('plattenteller_spotify_creds');
-    if(saved){
-      const parsed = JSON.parse(saved);
-      clientIdInput.value = parsed.clientId || '';
-      clientSecretInput.value = parsed.clientSecret || '';
-      if(parsed.clientId && parsed.clientSecret){
-        connectText.textContent = 'Gespeicherte Zugangsdaten gefunden — verbinde automatisch…';
-        setTimeout(() => connectBtn.click(), 50);
-      }
-    }
-  }catch(e){ /* localStorage unavailable, ignore */ }
 
   async function fetchToken(){
     const res = await fetch('https://accounts.spotify.com/api/token', {
@@ -807,51 +771,27 @@
     tokenExpiresAt = Date.now() + (data.expires_in * 1000);
   }
 
-  connectBtn.onclick = async () => {
-    clientId = clientIdInput.value.trim();
-    clientSecret = clientSecretInput.value.trim();
-    if(!clientId || !clientSecret){
-      connectText.textContent = 'Bitte Client ID und Client Secret eintragen.';
-      connectDot.className = 'dot err';
-      return;
-    }
-    connectText.textContent = 'Verbinde…';
+  async function autoConnect(){
+    connectText.textContent = 'Verbinde mit Spotify…';
     connectDot.className = 'dot';
     try{
       await fetchToken();
-      connectText.textContent = 'Verbunden ✓ — Token wird automatisch erneuert';
+      connectText.textContent = 'Verbunden ✓';
       connectDot.className = 'dot ok';
       searchPanel.style.display = 'block';
-      if(rememberMeInput.checked){
-        try{ localStorage.setItem('plattenteller_spotify_creds', JSON.stringify({clientId, clientSecret})); }catch(e){}
-      }else{
-        try{ localStorage.removeItem('plattenteller_spotify_creds'); }catch(e){}
-      }
     }catch(err){
-      connectText.textContent = 'Fehler: ' + err.message + ' — Client ID/Secret prüfen (siehe Konsole F12 für Details).';
+      connectText.textContent = 'Verbindung fehlgeschlagen — Zugangsdaten im Code prüfen (siehe Konsole F12).';
       connectDot.className = 'dot err';
-      console.error('Spotify connect error:', err);
+      console.error('Spotify auto-connect error:', err);
     }
-  };
+  }
+  autoConnect();
 
   async function ensureFreshToken(){
     if(accessToken && Date.now() < tokenExpiresAt - 30000) return true;
-    if(!clientId || !clientSecret) return false;
     try{ await fetchToken(); return true; }
     catch(err){ console.error('Silent token refresh failed:', err); return false; }
   }
-
-  document.getElementById('forgetCredsLink').addEventListener('click', (e) => {
-    e.preventDefault();
-    try{ localStorage.removeItem('plattenteller_spotify_creds'); }catch(err){}
-    clientIdInput.value = '';
-    clientSecretInput.value = '';
-    accessToken = null;
-    clientId = ''; clientSecret = '';
-    connectText.textContent = 'Zugangsdaten gelöscht.';
-    connectDot.className = 'dot';
-    searchPanel.style.display = 'none';
-  });
 
   // ---------- GENRE / DECADE PICKERS ----------
   const GENRES = ['Rock','Pop','Hip-Hop','Electronic','Indie','Metal','Jazz','Deutschrap','Schlager','Punk','R&B','Reggae','Klassik','Country'];
