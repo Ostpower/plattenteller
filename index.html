@@ -1060,8 +1060,9 @@
         await ensureFreshToken();
 
         const perCall = 10; // Spotify's search endpoint only allows limit 0-10
-        const maxOffset = 950; // Spotify caps offset+limit at 1000 — use the full range for real variety
+        const maxOffset = 300; // stay within reasonably relevant/known territory — deeper offsets surface very obscure results
         const maxCalls = 30;
+        const minPopularity = 35; // filters out very obscure/unknown tracks (0-100 scale)
 
         for(let i = 0; i < maxCalls; i++){
           const callQuery = buildSpotifyQuery();
@@ -1089,7 +1090,7 @@
             throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + ' (Query: ' + callQuery + ')');
           }
           const data = await res.json();
-          const items = (data.tracks && data.tracks.items) ? data.tracks.items.filter(t => t && t.id) : [];
+          const items = (data.tracks && data.tracks.items) ? data.tracks.items.filter(t => t && t.id && t.popularity >= minPopularity) : [];
           let addedAny = false;
           items.forEach(t => {
             if(seenIds.has('sp_' + t.id)) return;
