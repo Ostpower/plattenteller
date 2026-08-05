@@ -544,6 +544,30 @@
         <div id="trackList"></div>
       </div>
 
+      <details class="advanced" open>
+        <summary>Spotify-Playlist importieren</summary>
+        <p class="hint" style="margin-top:10px;">
+          Link zu einer öffentlichen Spotify-Playlist einfügen, oder eine der offiziellen HITSTER-Playlists unten anklicken — die App holt alle Songs daraus, wendet die Interpret-Begrenzung an und wählt zufällig die gewünschte Anzahl aus.
+        </p>
+        <label>Schnellauswahl: offizielle HITSTER-Playlists</label>
+        <div class="pick-group" id="hitsterPresetChips" style="margin-bottom:14px;">
+          <div class="pick-chip" data-playlist="26zIHVncgI9HmHlgYWwnDi">Classic / Deutsch</div>
+          <div class="pick-chip" data-playlist="4oYTRg0JI48jucsJOLily1">Rock</div>
+          <div class="pick-chip" data-playlist="15hZ0ez6sHYhTeCCshxJTN">Summer Party</div>
+          <div class="pick-chip" data-playlist="2u0vgWYqU1TWVcDehJnZuN">Guilty Pleasures</div>
+          <div class="pick-chip" data-playlist="0USUpphpG4nAuz9IUudfl9">Schlager Party</div>
+          <div class="pick-chip" data-playlist="6a0Z098RE1Bwrii6cuLDAE">Platinum (alle Editionen)</div>
+          <div class="pick-chip" data-playlist="6lEEWbPCGtS3425Z9ub1pn">100% US</div>
+        </div>
+        <div class="field">
+          <label>Playlist-Link</label>
+          <input type="text" id="playlistUrlInput" placeholder="https://open.spotify.com/playlist/...">
+        </div>
+        <button class="btn-coral btn-block" id="importPlaylistBtn">Playlist laden</button>
+        <div id="playlistImportStatus" class="empty-note"></div>
+        <button class="btn-ghost btn-block" id="reshufflePlaylistBtn" style="display:none; margin-top:8px;">Andere Auswahl aus dieser Playlist</button>
+      </details>
+
       <details class="advanced">
         <summary>Einzelnen Song manuell per Link hinzufügen</summary>
         <div class="field">
@@ -1006,6 +1030,19 @@
   fetchTracksBtn.onclick = () => runSearch(true);
   reshuffleBtn.onclick = () => runSearch(false);
 
+  function pickWithArtistCap(pool, count, maxPerArtist){
+    const artistCount = {};
+    const result = [];
+    for(const t of shuffle(pool)){
+      const used = artistCount[t.artistKey] || 0;
+      if(used >= maxPerArtist) continue;
+      artistCount[t.artistKey] = used + 1;
+      result.push(t);
+      if(result.length >= count) break;
+    }
+    return result;
+  }
+
   async function runSearch(isFirst){
     let query = freeQueryInput.value.trim();
     const usingFreeText = !!query;
@@ -1031,19 +1068,6 @@
         return variants[Math.floor(Math.random() * variants.length)];
       }
       return '';
-    }
-
-    function pickWithArtistCap(pool, count, maxPerArtist){
-      const artistCount = {};
-      const result = [];
-      for(const t of shuffle(pool)){
-        const used = artistCount[t.artistKey] || 0;
-        if(used >= maxPerArtist) continue;
-        artistCount[t.artistKey] = used + 1;
-        result.push(t);
-        if(result.length >= count) break;
-      }
-      return result;
     }
 
     fetchStatus.textContent = 'Suche Songs…';
@@ -1203,6 +1227,94 @@
       console.error('Search error:', err);
     }
   }
+
+  // ---------- PLAYLIST IMPORT ----------
+  const playlistUrlInput = document.getElementById('playlistUrlInput');
+  const importPlaylistBtn = document.getElementById('importPlaylistBtn');
+  const playlistImportStatus = document.getElementById('playlistImportStatus');
+  const reshufflePlaylistBtn = document.getElementById('reshufflePlaylistBtn');
+  let importedPlaylistPool = [];
+
+  document.querySelectorAll('#hitsterPresetChips .pick-chip').forEach(chip => {
+    chip.onclick = () => {
+      const id = chip.getAttribute('data-playlist');
+      playlistUrlInput.value = 'https://open.spotify.com/playlist/' + id;
+      importPlaylistBtn.click();
+    };
+  });
+
+  function extractPlaylistId(url){
+    const m = url.match(/playlist\/([a-zA-Z0-9]+)/);
+    return m ? m[1] : null;
+  }
+
+  async function fetchPlaylistTracks(playlistId){
+    const pool = [];
+    let url = 'https://api.spotify.com/v1/playlists/' + playlistId + '/tracks?limit=100&fields=next,items(track(id,uri,name,popularity,artists(id,name),album(images)))';
+    let pageCount = 0;
+    while(url && pageCount < 20){ // safety cap: up to 2000 tracks
+      let res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+      if(res.status === 401){
+        const refreshed = await ensureFreshToken();
+        if(!refreshed) throw new Error('Verbindung zu Spotify verloren — bitte oben erneut verbinden.');
+        res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+      }
+      if(!res.ok){
+        let detail = '';
+        try{ const errJson = await res.json(); detail = errJson.error && errJson.error.message ? errJson.error.message : ''; }catch(e2){}
+        throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + ' — ist die Playlist öffentlich?');
+      }
+      const data = await res.json();
+      (data.items || []).forEach(item => {
+        const t = item.track;
+        if(!t || !t.id) return;
+        pool.push({
+          id: 'sp_' + t.id,
+          source: 'spotify',
+          uri: t.uri,
+          title: t.name,
+          artist: t.artists.map(a => a.name).join(', '),
+          artistKey: t.artists[0] ? t.artists[0].id : t.artists.map(a=>a.name).join(','),
+          cover: (t.album && t.album.images && t.album.images.length) ? t.album.images[t.album.images.length > 2 ? 1 : 0].url : ''
+        });
+      });
+      url = data.next;
+      pageCount++;
+    }
+    return pool;
+  }
+
+  function sampleFromImportedPool(){
+    const desired = Math.max(4, Math.min(50, parseInt(deckSizeInput.value) || 15));
+    const maxPerArtist = 2;
+    const picked = pickWithArtistCap(importedPlaylistPool, desired, maxPerArtist);
+    tracks = picked;
+    playlistImportStatus.textContent = tracks.length + ' von ' + importedPlaylistPool.length + ' Playlist-Songs geladen (max. ' + maxPerArtist + ' je Interpret)';
+    reshufflePlaylistBtn.style.display = 'inline-block';
+    renderTracks();
+    checkStart();
+  }
+
+  importPlaylistBtn.onclick = async () => {
+    if(!accessToken){ playlistImportStatus.textContent = 'Nicht verbunden — bitte oben zuerst mit Spotify verbinden.'; return; }
+    const id = extractPlaylistId(playlistUrlInput.value.trim());
+    if(!id){ playlistImportStatus.textContent = 'Das sieht nicht nach einem gültigen open.spotify.com/playlist/-Link aus.'; return; }
+    playlistImportStatus.textContent = 'Lade Playlist…';
+    reshufflePlaylistBtn.style.display = 'none';
+    try{
+      await ensureFreshToken();
+      importedPlaylistPool = await fetchPlaylistTracks(id);
+      if(importedPlaylistPool.length === 0){
+        playlistImportStatus.textContent = 'Keine Songs in dieser Playlist gefunden.';
+        return;
+      }
+      sampleFromImportedPool();
+    }catch(err){
+      playlistImportStatus.textContent = 'Fehler: ' + err.message;
+      console.error('Playlist import error:', err);
+    }
+  };
+  reshufflePlaylistBtn.onclick = sampleFromImportedPool;
 
   // ---------- MANUAL ADD (fallback) ----------
   const trackUrlInput = document.getElementById('trackUrlInput');
