@@ -498,26 +498,10 @@
 
     <div class="panel">
       <h2>1. Spotify verbinden</h2>
-      <p class="hint">
-        Spotify blockiert das Holen eines Zugangs-Tokens direkt aus dem Browser (CORS) — deshalb holst du ihn dir einmalig selbst, außerhalb der App. Dauert 10 Sekunden:
+      <p class="hint" id="connectHint">
+        Einmalig mit Spotify verbinden — danach merkt sich dieser Browser die Verbindung dauerhaft, kein erneutes Einloggen nötig.
       </p>
-      <details class="advanced" open style="margin-top:0; padding-top:0; border-top:none;">
-        <summary>Anleitung: Token holen</summary>
-        <p class="hint" style="margin-top:10px;">
-          1. Öffne ein Terminal (Mac/Linux) bzw. PowerShell bei Windows 10/11 und ersetze <em>DEINE_CLIENT_ID</em> / <em>DEIN_CLIENT_SECRET</em> mit deinen Werten aus dem Spotify-Dashboard. Unter Windows PowerShell <code>curl.exe</code> statt <code>curl</code> verwenden:
-        </p>
-        <pre style="background:var(--groove); border-radius:10px; padding:12px; font-family:var(--mono); font-size:11.5px; overflow-x:auto; white-space:pre-wrap; color:var(--cream); margin-bottom:10px;">curl -X POST https://accounts.spotify.com/api/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials&client_id=DEINE_CLIENT_ID&client_secret=DEIN_CLIENT_SECRET"</pre>
-        <p class="hint">
-          2. Aus der Antwort den Wert von <em>"access_token"</em> kopieren (ohne Anführungszeichen) und unten einfügen. Gültig ca. 60 Minuten — danach einfach den Befehl nochmal ausführen und neu einfügen.
-        </p>
-      </details>
-      <div class="field" style="margin-top:12px;">
-        <label>Access Token</label>
-        <input type="password" id="accessTokenInput" placeholder="Access Token einfügen">
-      </div>
-      <button class="btn-gold" id="connectBtn">Verbinden</button>
+      <button class="btn-gold" id="connectBtn">Mit Spotify verbinden</button>
       <div class="connect-status"><div class="dot" id="connectDot"></div><span id="connectText">Noch nicht verbunden</span></div>
     </div>
 
@@ -737,6 +721,7 @@
 
   let accessToken = null;
   let tokenObtainedAt = 0;
+  let tokenExpiresInMs = 0;
 
   window.onSpotifyIframeApiReady = (IFrameAPI) => { spotifyIFrameAPI = IFrameAPI; };
 
@@ -771,46 +756,156 @@
   function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
   function normalize(s){ return (s||'').toLowerCase().trim().replace(/[^a-z0-9äöüß\s]/gi,'').replace(/\s+/g,' '); }
 
-  // ---------- SPOTIFY AUTH (Access Token wird manuell eingefügt, siehe Anleitung in der Seite) ----------
-  const accessTokenInput = document.getElementById('accessTokenInput');
+  // ---------- SPOTIFY AUTH (Authorization Code Flow mit PKCE — kein Client Secret nötig) ----------
+  // Deine Client ID ist NICHT geheim (im Gegensatz zum Client Secret) — sie darf hier stehen.
+  const CLIENT_ID = 'DEINE_CLIENT_ID_HIER';
+  // Muss exakt (inkl. Slash am Ende) als Redirect-URI im Spotify-Dashboard eingetragen sein.
+  const REDIRECT_URI = window.location.origin + window.location.pathname;
+  const PKCE_STORAGE_KEY = 'plattenteller_pkce_verifier';
+  const REFRESH_STORAGE_KEY = 'plattenteller_refresh_token';
+
   const connectBtn = document.getElementById('connectBtn');
   const connectDot = document.getElementById('connectDot');
   const connectText = document.getElementById('connectText');
+  const connectHint = document.getElementById('connectHint');
   const searchPanel = document.getElementById('searchPanel');
 
-  connectBtn.onclick = async () => {
-    const token = accessTokenInput.value.trim();
-    if(!token){
-      connectText.textContent = 'Bitte Access Token einfügen.';
+  function base64UrlEncode(bytes){
+    let str = '';
+    bytes.forEach(b => str += String.fromCharCode(b));
+    return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function randomVerifier(length = 64){
+    const arr = new Uint8Array(length);
+    crypto.getRandomValues(arr);
+    return base64UrlEncode(arr).slice(0, length);
+  }
+  async function codeChallengeFor(verifier){
+    const data = new TextEncoder().encode(verifier);
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    return base64UrlEncode(new Uint8Array(digest));
+  }
+
+  async function startSpotifyLogin(){
+    if(CLIENT_ID === 'DEINE_CLIENT_ID_HIER'){
+      connectText.textContent = 'Client ID noch nicht im Code eingetragen.';
       connectDot.className = 'dot err';
       return;
     }
-    connectText.textContent = 'Prüfe Token…';
-    connectDot.className = 'dot';
-    try{
-      const res = await fetch('https://api.spotify.com/v1/search?q=test&type=track&limit=1', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      if(!res.ok){
-        let detail = '';
-        try{ const errJson = await res.json(); detail = errJson.error && errJson.error.message ? errJson.error.message : ''; }catch(e2){}
-        throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : ''));
-      }
-      accessToken = token;
-      tokenObtainedAt = Date.now();
-      connectText.textContent = 'Verbunden ✓ (Token ca. 60 Min. gültig)';
-      connectDot.className = 'dot ok';
-      searchPanel.style.display = 'block';
-    }catch(err){
-      connectText.textContent = 'Token ungültig oder abgelaufen — neu holen und einfügen.';
-      connectDot.className = 'dot err';
-      console.error('Spotify connect error:', err);
+    const verifier = randomVerifier();
+    try{ sessionStorage.setItem(PKCE_STORAGE_KEY, verifier); }catch(e){}
+    const challenge = await codeChallengeFor(verifier);
+    const params = new URLSearchParams({
+      client_id: CLIENT_ID,
+      response_type: 'code',
+      redirect_uri: REDIRECT_URI,
+      code_challenge_method: 'S256',
+      code_challenge: challenge,
+      scope: ''
+    });
+    window.location.href = 'https://accounts.spotify.com/authorize?' + params.toString();
+  }
+
+  async function exchangeCodeForTokens(code){
+    const verifier = sessionStorage.getItem(PKCE_STORAGE_KEY) || '';
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: REDIRECT_URI,
+        code_verifier: verifier
+      })
+    });
+    if(!res.ok) throw new Error('Code-Austausch fehlgeschlagen: HTTP ' + res.status);
+    return res.json();
+  }
+
+  async function refreshAccessToken(refreshToken){
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken
+      })
+    });
+    if(!res.ok) throw new Error('Token-Erneuerung fehlgeschlagen: HTTP ' + res.status);
+    return res.json();
+  }
+
+  function applyTokenResponse(data){
+    accessToken = data.access_token;
+    tokenObtainedAt = Date.now();
+    tokenExpiresInMs = (data.expires_in || 3600) * 1000;
+    if(data.refresh_token){
+      try{ localStorage.setItem(REFRESH_STORAGE_KEY, data.refresh_token); }catch(e){}
     }
-  };
+  }
 
   async function ensureFreshToken(){
-    return !!accessToken; // kein automatisches Erneuern möglich ohne Server — Hinweis läuft über den 401-Handler unten
+    if(accessToken && (Date.now() - tokenObtainedAt) < tokenExpiresInMs - 30000) return true;
+    let refreshToken = null;
+    try{ refreshToken = localStorage.getItem(REFRESH_STORAGE_KEY); }catch(e){}
+    if(!refreshToken) return false;
+    try{
+      const data = await refreshAccessToken(refreshToken);
+      applyTokenResponse(data);
+      return true;
+    }catch(err){
+      console.error('Silent refresh failed:', err);
+      return false;
+    }
   }
+
+  connectBtn.onclick = startSpotifyLogin;
+
+  async function initAuth(){
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const errorParam = params.get('error');
+
+    if(errorParam){
+      connectText.textContent = 'Spotify-Login abgebrochen oder fehlgeschlagen.';
+      connectDot.className = 'dot err';
+      history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
+    if(code){
+      connectText.textContent = 'Verbinde…';
+      connectDot.className = 'dot';
+      try{
+        const data = await exchangeCodeForTokens(code);
+        applyTokenResponse(data);
+        history.replaceState({}, '', window.location.pathname); // Code aus der URL entfernen
+        connectText.textContent = 'Verbunden ✓';
+        connectDot.className = 'dot ok';
+        connectHint.textContent = 'Verbunden — dieser Browser bleibt dauerhaft angemeldet.';
+        connectBtn.style.display = 'none';
+        searchPanel.style.display = 'block';
+      }catch(err){
+        connectText.textContent = 'Verbindung fehlgeschlagen: ' + err.message;
+        connectDot.className = 'dot err';
+        console.error(err);
+      }
+      return;
+    }
+
+    // Kein frischer Login-Code in der URL — versuche stillschweigend mit gespeichertem Refresh-Token
+    const ok = await ensureFreshToken();
+    if(ok){
+      connectText.textContent = 'Verbunden ✓';
+      connectDot.className = 'dot ok';
+      connectHint.textContent = 'Verbunden — dieser Browser bleibt dauerhaft angemeldet.';
+      connectBtn.style.display = 'none';
+      searchPanel.style.display = 'block';
+    }
+  }
+  initAuth();
 
   // ---------- GENRE / DECADE PICKERS ----------
   const GENRES = ['Rock','Pop','Hip-Hop','Electronic','Indie','Metal','Jazz','Deutsche Musik','Deutschrap','Schlager','Punk','R&B','Reggae','Klassik','Country'];
@@ -959,6 +1054,7 @@
 
       if(selectedSource === 'spotify'){
         if(!accessToken){ fetchStatus.textContent = 'Nicht verbunden — bitte oben zuerst mit Spotify verbinden.'; return; }
+        await ensureFreshToken();
 
         const perCall = 10; // Spotify's search endpoint only allows limit 0-10
         const maxOffset = 950; // Spotify caps offset+limit at 1000 — use the full range for real variety
@@ -974,12 +1070,15 @@
           } while(usedCombos.has(combo) && attempts < 20);
           usedCombos.add(combo);
 
-          const res = await fetch('https://api.spotify.com/v1/search?q=' + encodeURIComponent(callQuery) + '&type=track&limit=' + perCall + '&offset=' + offset + '&market=DE', {
+          let res = await fetch('https://api.spotify.com/v1/search?q=' + encodeURIComponent(callQuery) + '&type=track&limit=' + perCall + '&offset=' + offset + '&market=DE', {
             headers: { 'Authorization': 'Bearer ' + accessToken }
           });
           if(res.status === 401){
-            fetchStatus.textContent = 'Token abgelaufen — neuen Token holen und oben erneut verbinden.';
-            return;
+            const refreshed = await ensureFreshToken();
+            if(!refreshed){ fetchStatus.textContent = 'Verbindung zu Spotify verloren — bitte oben erneut verbinden.'; return; }
+            res = await fetch('https://api.spotify.com/v1/search?q=' + encodeURIComponent(callQuery) + '&type=track&limit=' + perCall + '&offset=' + offset + '&market=DE', {
+              headers: { 'Authorization': 'Bearer ' + accessToken }
+            });
           }
           if(!res.ok){
             let detail = '';
