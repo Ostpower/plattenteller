@@ -572,6 +572,9 @@
   </div>
 
   <div id="game-screen" style="display:none;">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+      <button class="btn-ghost btn-sm" id="cancelGameBtn">← Spiel abbrechen / Einstellungen</button>
+    </div>
     <div class="scoreboard" id="scoreboard"></div>
 
     <div class="panel stage">
@@ -1456,6 +1459,16 @@
 
   document.getElementById('restartBtn').onclick = () => {
     players.forEach(p => p.score = 0);
+    endScreen.style.display = 'none';
+    setupScreen.style.display = 'block';
+  };
+
+  document.getElementById('cancelGameBtn').onclick = () => {
+    if(!confirm('Spiel wirklich abbrechen und zu den Einstellungen zurück? Der Punktestand geht dabei verloren.')) return;
+    if(controller) controller.pause();
+    deezerAudio.pause();
+    players.forEach(p => p.score = 0);
+    gameScreen.style.display = 'none';
     endScreen.style.display = 'none';
     setupScreen.style.display = 'block';
   };
