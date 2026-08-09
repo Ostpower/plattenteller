@@ -1255,7 +1255,7 @@
 
   async function fetchPlaylistTracks(playlistId){
     const pool = [];
-    let url = 'https://api.spotify.com/v1/playlists/' + playlistId + '/tracks?limit=100&fields=next,items(track(id,uri,name,popularity,artists(id,name),album(images)))';
+    let url = 'https://api.spotify.com/v1/playlists/' + playlistId + '/items?limit=100&fields=next,items(track(id,uri,name,popularity,artists(id,name),album(images)))';
     let pageCount = 0;
     while(url && pageCount < 20){ // safety cap: up to 2000 tracks
       let res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
