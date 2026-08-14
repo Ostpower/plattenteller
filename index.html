@@ -583,6 +583,7 @@
           <div class="field"><label>Titel</label><input type="text" id="trackTitleInput" placeholder="wird ggf. automatisch ausgefüllt"></div>
           <div class="field"><label>Interpret</label><input type="text" id="trackArtistInput" placeholder="Interpret eintragen"></div>
         </div>
+        <div class="field"><label>Fun Fact (optional)</label><input type="text" id="trackFunFactInput" placeholder="z.B. Stand 8 Wochen auf Platz 1"></div>
         <button class="btn-ghost btn-block" id="addTrackBtn">+ Song manuell hinzufügen</button>
       </details>
     </div>
@@ -662,6 +663,12 @@
       <div class="guess-panel" id="guessPanel">
         <div class="field"><label>Tipp: Titel</label><input type="text" id="guessTitle" placeholder="Songtitel…"></div>
         <div class="field"><label>Tipp: Interpret</label><input type="text" id="guessArtist" placeholder="Interpret…"></div>
+        <div id="stealBox" style="display:none; margin-bottom:14px;">
+          <label style="display:flex; align-items:center; gap:9px; cursor:pointer; text-transform:none; letter-spacing:0; font-family:var(--body); font-size:13px; color:var(--gold);">
+            <input type="checkbox" id="stealToggle" style="width:17px; height:17px; accent-color:var(--gold);">
+            🥷 Klau-Bonus einsetzen — bei Treffer −2 Pkt. vom Erstplatzierten (einmalig)
+          </label>
+        </div>
         <button class="btn-gold btn-block" id="revealBtn">Aufdecken</button>
       </div>
 
@@ -674,6 +681,9 @@
             <div class="ra" id="revealArtist"></div>
           </div>
         </div>
+        <div id="funFactBox" style="display:none; font-family:var(--mono); font-size:12.5px; color:var(--slate); background:var(--groove); border-radius:10px; padding:10px 12px; margin:-6px 0 16px;">
+          💡 <span id="funFactText"></span>
+        </div>
         <label>Wer war dran: <span id="revealPlayerName" style="color:var(--gold);"></span> — wie bewerten?</label>
         <div class="judge-grid">
           <button class="btn-ghost" data-score="2" id="judgeBoth">Beides richtig (+2)</button>
@@ -681,6 +691,7 @@
           <button class="btn-ghost" data-score="1b">Nur Interpret (+1)</button>
           <button class="btn-ghost" data-score="0">Nichts richtig</button>
         </div>
+        <div id="roundBonusNote" class="empty-note" style="min-height:18px; margin-top:8px;"></div>
         <button class="btn-coral btn-block" id="nextRoundBtn" style="margin-top:14px;">Nächster Song →</button>
       </div>
     </div>
@@ -771,6 +782,7 @@
       });
       controller.addListener('playback_update', (e) => {
         isPlaying = !e.data.isPaused;
+        if(isPlaying && trackStartedAt === null){ trackStartedAt = Date.now(); }
         updateTransportUI();
       });
     });
@@ -1325,6 +1337,7 @@
   const trackUrlInput = document.getElementById('trackUrlInput');
   const trackTitleInput = document.getElementById('trackTitleInput');
   const trackArtistInput = document.getElementById('trackArtistInput');
+  const trackFunFactInput = document.getElementById('trackFunFactInput');
   const addTrackBtn = document.getElementById('addTrackBtn');
   let lastFetchedCover = '';
 
@@ -1349,8 +1362,9 @@
     if(!id){ fetchStatus.textContent = 'Das sieht nicht nach einem gültigen open.spotify.com/track/-Link aus.'; return; }
     const title = trackTitleInput.value.trim() || 'Unbekannter Titel';
     const artist = trackArtistInput.value.trim() || 'Unbekannter Interpret';
-    tracks.push({ id: 'sp_' + id, source: 'spotify', uri: 'spotify:track:' + id, title, artist, artistKey: artist, cover: lastFetchedCover });
-    trackUrlInput.value = ''; trackTitleInput.value = ''; trackArtistInput.value = '';
+    const funFact = trackFunFactInput.value.trim() || null;
+    tracks.push({ id: 'sp_' + id, source: 'spotify', uri: 'spotify:track:' + id, title, artist, artistKey: artist, cover: lastFetchedCover, funFact });
+    trackUrlInput.value = ''; trackTitleInput.value = ''; trackArtistInput.value = ''; trackFunFactInput.value = '';
     lastFetchedCover = '';
     renderTracks();
     checkStart();
@@ -1401,7 +1415,7 @@
   function addPlayer(){
     const name = playerInput.value.trim();
     if(!name) return;
-    players.push({name, score:0});
+    players.push({name, score:0, streak:0, stealAvailable:false, stealUsed:false});
     playerInput.value = '';
     renderPlayers();
     checkStart();
@@ -1438,8 +1452,13 @@
   const revealArtist = document.getElementById('revealArtist');
   const revealPlayerName = document.getElementById('revealPlayerName');
   const nextRoundBtn = document.getElementById('nextRoundBtn');
+  const funFactBox = document.getElementById('funFactBox');
+  const funFactText = document.getElementById('funFactText');
+  const stealBox = document.getElementById('stealBox');
+  const stealToggle = document.getElementById('stealToggle');
 
   let totalDeckSize = 0;
+  let trackStartedAt = null; // Zeitpunkt des ersten Play-Taps für den aktuellen Song (für Speed-Bonus)
 
   startGameBtn.onclick = () => {
     deck = shuffle(tracks.map((_,i)=>i));
@@ -1460,10 +1479,12 @@
       const isActive = i === currentPlayerIdx;
       const chip = document.createElement('div');
       chip.className = 'score-chip' + (isActive ? ' active' : '');
+      const streakTag = (p.streak && p.streak >= 2) ? ` <span title="Streak">🔥${p.streak}</span>` : '';
       chip.innerHTML = `
         <div class="turn-badge" style="${isActive ? '' : 'visibility:hidden;'}">Am Zug</div>
         <div class="name">${escapeHtml(p.name)}${isLeader ? ' <span class="crown">👑</span>' : ''}</div>
         <div class="pts">${p.score}</div>
+        <div style="font-family:var(--mono); font-size:11px; color:var(--gold); min-height:14px;">${streakTag}</div>
       `;
       scoreboard.appendChild(chip);
     });
@@ -1481,6 +1502,8 @@
     deckRemainingLabel.textContent = deck.length === 0 ? 'letzter Song' : deck.length + ' danach übrig';
     deckProgressFill.style.width = Math.round((songNumber / totalDeckSize) * 100) + '%';
 
+    trackStartedAt = null; // Speed-Bonus-Uhr für den neuen Song zurücksetzen
+
     labelTitle.textContent = ''; labelTitle.classList.remove('shown');
     labelArtist.textContent = ''; labelArtist.classList.remove('shown');
     vinyl.classList.remove('spin');
@@ -1491,6 +1514,13 @@
     guessTitle.value = ''; guessArtist.value = '';
     guessPanel.style.display = 'block';
     revealPanel.style.display = 'none';
+    roundBonusNote.textContent = '';
+
+    const currentPlayer = players[currentPlayerIdx];
+    const canSteal = currentPlayer && currentPlayer.stealAvailable && !currentPlayer.stealUsed;
+    stealBox.style.display = canSteal ? 'block' : 'none';
+    stealToggle.checked = false;
+
 
     if(t.source === 'deezer'){
       deezerAudio.pause();
@@ -1509,7 +1539,7 @@
   }
 
   const deezerAudio = document.getElementById('deezerAudio');
-  deezerAudio.addEventListener('play', () => { isPlaying = true; updateTransportUI(); });
+  deezerAudio.addEventListener('play', () => { isPlaying = true; if(trackStartedAt === null){ trackStartedAt = Date.now(); } updateTransportUI(); });
   deezerAudio.addEventListener('pause', () => { isPlaying = false; updateTransportUI(); });
   deezerAudio.addEventListener('ended', () => { isPlaying = false; updateTransportUI(); });
 
@@ -1548,6 +1578,12 @@
       revealCover.style.display = 'none';
       revealCoverPlaceholder.style.display = 'flex';
     }
+    if(t.funFact){
+      funFactText.textContent = t.funFact;
+      funFactBox.style.display = 'block';
+    }else{
+      funFactBox.style.display = 'none';
+    }
     labelTitle.textContent = t.title;
     labelArtist.textContent = t.artist;
     requestAnimationFrame(() => {
@@ -1563,12 +1599,76 @@
         ? 'var(--gold)' : 'rgba(255,255,255,0.15)';
   };
 
+  const roundBonusNote = document.getElementById('roundBonusNote');
+
+  // Streak-Meilensteine: bei diesen Streak-Werten gibt's einen Extra-Schub.
+  // Ab 10 gibt's alle 5 weitere Treffer nochmal einen (kleineren) Bonus.
+  function streakBonusFor(streak){
+    if(streak === 3) return 2;
+    if(streak === 5) return 4;
+    if(streak === 10) return 8;
+    if(streak > 10 && streak % 5 === 0) return 6;
+    return 0;
+  }
+
   document.querySelectorAll('.judge-grid button[data-score]').forEach(btn => {
     btn.addEventListener('click', () => {
       const val = btn.getAttribute('data-score');
-      let pts = 0;
-      if(val === '2') pts = 2; else if(val === '1a' || val === '1b') pts = 1;
-      players[currentPlayerIdx].score += pts;
+      let basePts = 0;
+      if(val === '2') basePts = 2; else if(val === '1a' || val === '1b') basePts = 1;
+      const player = players[currentPlayerIdx];
+
+      // Speed-Bonus: nur wenn überhaupt Punkte verdient wurden, gemessen ab dem ersten Play-Tap.
+      let speedBonus = 0;
+      if(basePts > 0 && trackStartedAt){
+        const elapsedSec = (Date.now() - trackStartedAt) / 1000;
+        if(elapsedSec <= 5) speedBonus = 2;
+        else if(elapsedSec <= 10) speedBonus = 1;
+      }
+
+      // Streak zählt nur bei "Beides richtig" hoch, jede andere Bewertung setzt ihn zurück.
+      let streakBonus = 0;
+      let justUnlockedSteal = false;
+      if(val === '2'){
+        player.streak = (player.streak || 0) + 1;
+        streakBonus = streakBonusFor(player.streak);
+        if(player.streak === 3 && !player.stealAvailable && !player.stealUsed){
+          player.stealAvailable = true;
+          justUnlockedSteal = true;
+        }
+      } else {
+        player.streak = 0;
+      }
+
+      // Steal: einmalig pro Spiel, wird per Toggle vor dem Aufdecken scharfgemacht.
+      // Bei Treffer (basePts > 0) werden bis zu 2 Punkte vom aktuellen Erstplatzierten abgezogen.
+      // Der Versuch wird verbraucht, sobald er scharfgemacht war — unabhängig vom Ausgang.
+      let stealAmount = 0;
+      let stolenFrom = null;
+      const stealWasArmed = player.stealAvailable && !player.stealUsed && stealToggle.checked;
+      if(stealWasArmed){
+        player.stealUsed = true;
+        if(basePts > 0){
+          const rivals = players.filter(p => p !== player);
+          const leader = rivals.reduce((best, p) => (!best || p.score > best.score) ? p : best, null);
+          if(leader && leader.score > 0){
+            stealAmount = Math.min(2, leader.score);
+            leader.score -= stealAmount;
+            stolenFrom = leader.name;
+          }
+        }
+      }
+
+      const total = basePts + speedBonus + streakBonus + stealAmount;
+      player.score += total;
+
+      const parts = [`Basis +${basePts}`];
+      if(speedBonus > 0) parts.push(`Speed +${speedBonus}`);
+      if(streakBonus > 0) parts.push(`Streak 🔥${player.streak} +${streakBonus}`);
+      if(stealAmount > 0) parts.push(`🥷 geklaut von ${stolenFrom} +${stealAmount}`);
+      if(justUnlockedSteal) parts.push('🥷 Steal freigeschaltet für die nächste Chance!');
+      roundBonusNote.textContent = total > 0 ? parts.join(' · ') + ` = ${total} Pkt.` : 'Keine Punkte diese Runde.';
+
       renderScoreboard();
     });
   });
@@ -1598,7 +1698,7 @@
   }
 
   document.getElementById('restartBtn').onclick = () => {
-    players.forEach(p => p.score = 0);
+    players.forEach(p => { p.score = 0; p.streak = 0; p.stealAvailable = false; p.stealUsed = false; });
     endScreen.style.display = 'none';
     setupScreen.style.display = 'block';
   };
@@ -1607,7 +1707,7 @@
     if(!confirm('Spiel wirklich abbrechen und zu den Einstellungen zurück? Der Punktestand geht dabei verloren.')) return;
     if(controller) controller.pause();
     deezerAudio.pause();
-    players.forEach(p => p.score = 0);
+    players.forEach(p => { p.score = 0; p.streak = 0; p.stealAvailable = false; p.stealUsed = false; });
     gameScreen.style.display = 'none';
     endScreen.style.display = 'none';
     setupScreen.style.display = 'block';
