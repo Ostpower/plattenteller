@@ -1046,6 +1046,13 @@
   fetchTracksBtn.onclick = () => runSearch(true);
   reshuffleBtn.onclick = () => runSearch(false);
 
+  // Grobe Heuristik: enthält Titel/Interpret Zeichen aus nicht-lateinischen Schriften
+  // (Kyrillisch, Griechisch, Hebräisch, Arabisch, CJK)? Für ein Ratespiel in Mitteleuropa
+  // sind solche Songs praktisch nicht erratbar, selbst wenn sie laut Spotify "populär" sind.
+  function hasNonLatinScript(text){
+    return /[\u0400-\u04FF\u0370-\u03FF\u0590-\u05FF\u0600-\u06FF\uAC00-\uD7A3\u3040-\u30FF\u4E00-\u9FFF]/.test(text || '');
+  }
+
   function pickWithArtistCap(pool, count, maxPerArtist){
     const artistCount = {};
     const result = [];
@@ -1193,6 +1200,7 @@
                 artistKey: t.artists[0] ? t.artists[0].id : t.artists.map(a=>a.name).join(','),
                 cover: (t.album && t.album.images && t.album.images.length) ? t.album.images[t.album.images.length > 2 ? 1 : 0].url : ''
               };
+              if(hasNonLatinScript(mapped.title) || hasNonLatinScript(mapped.artist)) return; // für dieses Ratespiel nicht lesbar/erratbar
               if(!seenRawIds.has(mapped.id)){ seenRawIds.add(mapped.id); rawCollected.push(mapped); }
               if(t.popularity >= popHighThreshold) highPool.push(mapped);
               else if(t.popularity >= popLowThreshold) lowPool.push(mapped);
@@ -1254,12 +1262,15 @@
             const data = await res.json();
             const items = (data.data || []).filter(t => t && t.id && t.preview);
             items.forEach(t => {
+              const title = t.title;
+              const artist = t.artist ? t.artist.name : 'Unbekannter Interpret';
+              if(hasNonLatinScript(title) || hasNonLatinScript(artist)) return; // für dieses Ratespiel nicht lesbar/erratbar
               pool.push({
                 id: 'dz_' + t.id,
                 source: 'deezer',
                 previewUrl: t.preview,
-                title: t.title,
-                artist: t.artist ? t.artist.name : 'Unbekannter Interpret',
+                title: title,
+                artist: artist,
                 artistKey: t.artist ? String(t.artist.id) : t.title,
                 cover: t.album ? (t.album.cover_medium || t.album.cover_small || '') : ''
               });
