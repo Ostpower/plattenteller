@@ -516,7 +516,7 @@
       </div>
       <p class="hint" id="sourceHint" style="margin-top:-8px;">Spotify: volle Songs (bei Premium-Login im Browser) oder 30-Sek.-Vorschau.</p>
 
-      <label>Genre</label>
+      <label>Genre (Mehrfachauswahl möglich)</label>
       <div class="pick-group" id="genreChips"></div>
 
       <label>Jahrzehnt (optional)</label>
@@ -782,7 +782,6 @@
       });
       controller.addListener('playback_update', (e) => {
         isPlaying = !e.data.isPaused;
-        if(isPlaying && trackStartedAt === null){ trackStartedAt = Date.now(); }
         updateTransportUI();
       });
     });
@@ -979,7 +978,7 @@
     {label:'2000er', range:'2000-2009'}, {label:'2010er', range:'2010-2019'},
     {label:'2020er', range:'2020-2029'}
   ];
-  let selectedGenre = null;
+  let selectedGenres = new Set();
   let selectedDecade = null;
   let selectedSource = 'spotify';
 
@@ -1015,8 +1014,8 @@
     c.className = 'pick-chip';
     c.textContent = g;
     c.onclick = () => {
-      selectedGenre = (selectedGenre === g) ? null : g;
-      [...genreChipsEl.children].forEach(ch => ch.classList.toggle('selected', ch.textContent === selectedGenre));
+      if(selectedGenres.has(g)) selectedGenres.delete(g); else selectedGenres.add(g);
+      c.classList.toggle('selected', selectedGenres.has(g));
     };
     genreChipsEl.appendChild(c);
   });
@@ -1060,39 +1059,78 @@
     return result;
   }
 
+  // Verteilt die gewünschte Deck-Größe fair über mehrere "Buckets" (z.B. je Genre und/oder
+  // Popularity-Stufe), statt einfach alles aus einem Topf zu ziehen. Reicht ein Bucket nicht
+  // aus, füllen die übrig gebliebenen Kandidaten aus anderen Buckets die Lücke auf.
+  function pickBalanced(buckets, maxPerArtist){
+    const artistCount = {};
+    const usedIds = new Set();
+    const result = [];
+    const leftover = [];
+    buckets.forEach(b => {
+      let added = 0;
+      for(const t of shuffle(b.pool)){
+        if(added >= b.target) { leftover.push(t); continue; }
+        if(usedIds.has(t.id)) continue;
+        const used = artistCount[t.artistKey] || 0;
+        if(used >= maxPerArtist){ leftover.push(t); continue; }
+        artistCount[t.artistKey] = used + 1;
+        usedIds.add(t.id);
+        result.push(t);
+        added++;
+      }
+    });
+    const totalTarget = buckets.reduce((s,b) => s + b.target, 0);
+    if(result.length < totalTarget){
+      for(const t of shuffle(leftover)){
+        if(result.length >= totalTarget) break;
+        if(usedIds.has(t.id)) continue;
+        const used = artistCount[t.artistKey] || 0;
+        if(used >= maxPerArtist) continue;
+        artistCount[t.artistKey] = used + 1;
+        usedIds.add(t.id);
+        result.push(t);
+      }
+    }
+    return result;
+  }
+
   async function runSearch(isFirst){
     let query = freeQueryInput.value.trim();
     const usingFreeText = !!query;
-    if(!usingFreeText && !selectedGenre && !selectedDecade){
-      fetchStatus.textContent = 'Bitte ein Genre/Jahrzehnt wählen oder Freitext eingeben.'; return;
+    if(!usingFreeText && selectedGenres.size === 0 && !selectedDecade){
+      fetchStatus.textContent = 'Bitte mindestens ein Genre/Jahrzehnt wählen oder Freitext eingeben.'; return;
     }
-    lastSearchQuery = usingFreeText ? query : (selectedGenre || '') + (selectedDecade && selectedSource === 'spotify' ? ' ' + selectedDecade : '');
+    lastSearchQuery = usingFreeText ? query : ([...selectedGenres].join(' + ') || 'Alle Genres') + (selectedDecade && selectedSource === 'spotify' ? ' ' + selectedDecade : '');
 
-    function buildSpotifyQuery(){
+    function buildSpotifyQuery(genre){
       if(usingFreeText) return query;
       const parts = [];
-      if(selectedGenre){
-        const variants = GENRE_VARIANTS[selectedGenre] || [selectedGenre.toLowerCase()];
+      if(genre){
+        const variants = GENRE_VARIANTS[genre] || [genre.toLowerCase()];
         parts.push('genre:"' + variants[Math.floor(Math.random() * variants.length)] + '"');
       }
       if(selectedDecade) parts.push('year:' + selectedDecade);
       return parts.join(' ');
     }
-    function buildDeezerQuery(){
+    function buildDeezerQuery(genre){
       if(usingFreeText) return query;
-      if(selectedGenre){
-        const variants = GENRE_VARIANTS[selectedGenre] || [selectedGenre.toLowerCase()];
+      if(genre){
+        const variants = GENRE_VARIANTS[genre] || [genre.toLowerCase()];
         return variants[Math.floor(Math.random() * variants.length)];
       }
       return '';
     }
 
+    // Ein "Bucket" pro gewähltem Genre — bei keiner Genre-Auswahl (Freitext/nur Jahrzehnt)
+    // gibt's genau einen ungefilterten Bucket.
+    const genreBuckets = usingFreeText ? [null] : (selectedGenres.size ? [...selectedGenres] : [null]);
+
     fetchStatus.textContent = 'Suche Songs…';
     try{
       const desired = Math.max(4, Math.min(50, parseInt(deckSizeInput.value) || 15));
       const maxPerArtist = 2;
-      const seenIds = new Set();
-      const usedCombos = new Set();
+      const perGenreTarget = Math.ceil(desired / genreBuckets.length);
       const collected = [];
       let picked = [];
 
@@ -1102,128 +1140,145 @@
 
         const perCall = 10; // Spotify's search endpoint only allows limit 0-10
         const maxOffset = 300; // stay within reasonably relevant/known territory — deeper offsets surface very obscure results
-        const maxCalls = 30;
-        const minPopularity = 15; // filters out only the most obscure/unknown tracks (0-100 scale)
-        const rawCollected = [];
+        const totalMaxCalls = 30;
+        const callsPerGenre = Math.max(3, Math.floor(totalMaxCalls / genreBuckets.length));
+        const popHighThreshold = 30; // "bekannte" Songs
+        const popLowThreshold = 10;  // "Geheimtipps" — darunter meist zu obskur
+        const highRatio = 0.7; // Zielverteilung: 70% bekannt, 30% Geheimtipp
+
+        const genrePools = []; // { genre, high: [...], low: [...] }
+        const rawCollected = []; // absoluter Fallback-Pool, jede Popularity
         const seenRawIds = new Set();
 
-        for(let i = 0; i < maxCalls; i++){
-          const callQuery = buildSpotifyQuery();
-          let offset, combo, attempts = 0;
-          do{
-            offset = Math.floor(Math.random() * (maxOffset / 10 + 1)) * 10;
-            combo = callQuery + '|' + offset;
-            attempts++;
-          } while(usedCombos.has(combo) && attempts < 20);
-          usedCombos.add(combo);
+        for(const genre of genreBuckets){
+          const highPool = [];
+          const lowPool = [];
+          const localSeenCombos = new Set();
 
-          let res = await fetch('https://api.spotify.com/v1/search?q=' + encodeURIComponent(callQuery) + '&type=track&limit=' + perCall + '&offset=' + offset + '&market=DE', {
-            headers: { 'Authorization': 'Bearer ' + accessToken }
-          });
-          if(res.status === 401){
-            const refreshed = await ensureFreshToken();
-            if(!refreshed){ fetchStatus.textContent = 'Verbindung zu Spotify verloren — bitte oben erneut verbinden.'; return; }
-            res = await fetch('https://api.spotify.com/v1/search?q=' + encodeURIComponent(callQuery) + '&type=track&limit=' + perCall + '&offset=' + offset + '&market=DE', {
+          for(let i = 0; i < callsPerGenre; i++){
+            const callQuery = buildSpotifyQuery(genre);
+            let offset, combo, attempts = 0;
+            do{
+              offset = Math.floor(Math.random() * (maxOffset / 10 + 1)) * 10;
+              combo = callQuery + '|' + offset;
+              attempts++;
+            } while(localSeenCombos.has(combo) && attempts < 20);
+            localSeenCombos.add(combo);
+
+            let res = await fetch('https://api.spotify.com/v1/search?q=' + encodeURIComponent(callQuery) + '&type=track&limit=' + perCall + '&offset=' + offset + '&market=DE', {
               headers: { 'Authorization': 'Bearer ' + accessToken }
             });
-          }
-          if(!res.ok){
-            let detail = '';
-            try{ const errJson = await res.json(); detail = errJson.error && errJson.error.message ? errJson.error.message : ''; }catch(e2){}
-            throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + ' (Query: ' + callQuery + ')');
-          }
-          const data = await res.json();
-          const rawItems = (data.tracks && data.tracks.items) ? data.tracks.items.filter(t => t && t.id) : [];
-          const items = rawItems.filter(t => t.popularity >= minPopularity);
-          let addedAny = false;
-          rawItems.forEach(t => {
-            if(seenRawIds.has('sp_' + t.id)) return;
-            seenRawIds.add('sp_' + t.id);
-            rawCollected.push({
-              id: 'sp_' + t.id,
-              source: 'spotify',
-              uri: t.uri,
-              title: t.name,
-              artist: t.artists.map(a => a.name).join(', '),
-              artistKey: t.artists[0] ? t.artists[0].id : t.artists.map(a=>a.name).join(','),
-              cover: (t.album && t.album.images && t.album.images.length) ? t.album.images[t.album.images.length > 2 ? 1 : 0].url : ''
-            });
-          });
-          items.forEach(t => {
-            if(seenIds.has('sp_' + t.id)) return;
-            seenIds.add('sp_' + t.id);
-            collected.push({
-              id: 'sp_' + t.id,
-              source: 'spotify',
-              uri: t.uri,
-              title: t.name,
-              artist: t.artists.map(a => a.name).join(', '),
-              artistKey: t.artists[0] ? t.artists[0].id : t.artists.map(a=>a.name).join(','),
-              cover: (t.album && t.album.images && t.album.images.length) ? t.album.images[t.album.images.length > 2 ? 1 : 0].url : ''
-            });
-            addedAny = true;
-          });
+            if(res.status === 401){
+              const refreshed = await ensureFreshToken();
+              if(!refreshed){ fetchStatus.textContent = 'Verbindung zu Spotify verloren — bitte oben erneut verbinden.'; return; }
+              res = await fetch('https://api.spotify.com/v1/search?q=' + encodeURIComponent(callQuery) + '&type=track&limit=' + perCall + '&offset=' + offset + '&market=DE', {
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+              });
+            }
+            if(!res.ok){
+              let detail = '';
+              try{ const errJson = await res.json(); detail = errJson.error && errJson.error.message ? errJson.error.message : ''; }catch(e2){}
+              throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + ' (Query: ' + callQuery + ')');
+            }
+            const data = await res.json();
+            const rawItems = (data.tracks && data.tracks.items) ? data.tracks.items.filter(t => t && t.id) : [];
 
-          picked = pickWithArtistCap(collected, desired, maxPerArtist);
-          if(picked.length >= desired) break;
-          if(!addedAny && data.tracks && (offset + perCall) >= data.tracks.total) continue;
-          fetchStatus.textContent = 'Suche Songs… (' + picked.length + '/' + desired + ', max. ' + maxPerArtist + ' je Interpret)';
+            rawItems.forEach(t => {
+              const mapped = {
+                id: 'sp_' + t.id,
+                source: 'spotify',
+                uri: t.uri,
+                title: t.name,
+                artist: t.artists.map(a => a.name).join(', '),
+                artistKey: t.artists[0] ? t.artists[0].id : t.artists.map(a=>a.name).join(','),
+                cover: (t.album && t.album.images && t.album.images.length) ? t.album.images[t.album.images.length > 2 ? 1 : 0].url : ''
+              };
+              if(!seenRawIds.has(mapped.id)){ seenRawIds.add(mapped.id); rawCollected.push(mapped); }
+              if(t.popularity >= popHighThreshold) highPool.push(mapped);
+              else if(t.popularity >= popLowThreshold) lowPool.push(mapped);
+            });
+
+            fetchStatus.textContent = 'Suche Songs… (' + (genre || 'Auswahl') + ': ' + highPool.length + ' bekannte, ' + lowPool.length + ' Geheimtipps)';
+            if(highPool.length >= perCall * 3 && lowPool.length >= perCall) break; // genug Material für diese Genre-Bucket
+          }
+          genrePools.push({ genre, high: highPool, low: lowPool });
         }
-        // Fallback: falls der Beliebtheits-Filter (fast) alles rausgefiltert hat, lieber unbekanntere
-        // Songs zeigen als gar keine
+
+        const buckets = [];
+        genrePools.forEach(gp => {
+          const highTarget = Math.round(perGenreTarget * highRatio);
+          const lowTarget = perGenreTarget - highTarget;
+          buckets.push({ pool: gp.high, target: highTarget });
+          buckets.push({ pool: gp.low, target: lowTarget });
+        });
+
+        picked = pickBalanced(buckets, maxPerArtist);
+        collected.push(...rawCollected);
+
+        // Fallback: falls (fast) nichts gefunden wurde, lieber unbekanntere Songs zeigen als gar keine
         if(picked.length === 0 && rawCollected.length > 0){
-          collected.push(...rawCollected);
-          picked = pickWithArtistCap(collected, desired, maxPerArtist);
+          picked = pickWithArtistCap(rawCollected, desired, maxPerArtist);
         }
       } else {
         // ---------- DEEZER ----------
         const perCall = 25;
         const maxIndex = 900;
-        const maxCalls = 20;
+        const totalMaxCalls = 20;
+        const callsPerGenre = Math.max(2, Math.floor(totalMaxCalls / genreBuckets.length));
 
-        for(let i = 0; i < maxCalls; i++){
-          const callQuery = buildDeezerQuery();
-          if(!callQuery){ fetchStatus.textContent = 'Bitte ein Genre wählen oder Freitext eingeben (Deezer unterstützt kein Jahrzehnt-Filter).'; return; }
-          let index, combo, attempts = 0;
-          do{
-            index = Math.floor(Math.random() * (maxIndex / perCall + 1)) * perCall;
-            combo = callQuery + '|' + index;
-            attempts++;
-          } while(usedCombos.has(combo) && attempts < 20);
-          usedCombos.add(combo);
+        const genrePools = []; // { genre, pool: [...] }
 
-          const res = await fetch(PROXY_URL + '/deezer-search?q=' + encodeURIComponent(callQuery) + '&index=' + index + '&limit=' + perCall, {
-            headers: { 'x-app-key': PROXY_APP_KEY }
-          });
-          if(!res.ok){
-            let detail = '';
-            try{ const errJson = await res.json(); detail = errJson.error || ''; }catch(e2){}
-            throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + ' (Query: ' + callQuery + ')');
-          }
-          const data = await res.json();
-          const items = (data.data || []).filter(t => t && t.id && t.preview);
-          let addedAny = false;
-          items.forEach(t => {
-            if(seenIds.has('dz_' + t.id)) return;
-            seenIds.add('dz_' + t.id);
-            collected.push({
-              id: 'dz_' + t.id,
-              source: 'deezer',
-              previewUrl: t.preview,
-              title: t.title,
-              artist: t.artist ? t.artist.name : 'Unbekannter Interpret',
-              artistKey: t.artist ? String(t.artist.id) : t.title,
-              cover: t.album ? (t.album.cover_medium || t.album.cover_small || '') : ''
+        for(const genre of genreBuckets){
+          const pool = [];
+          const localSeenCombos = new Set();
+
+          for(let i = 0; i < callsPerGenre; i++){
+            const callQuery = buildDeezerQuery(genre);
+            if(!callQuery){ fetchStatus.textContent = 'Bitte ein Genre wählen oder Freitext eingeben (Deezer unterstützt kein Jahrzehnt-Filter).'; return; }
+            let index, combo, attempts = 0;
+            do{
+              index = Math.floor(Math.random() * (maxIndex / perCall + 1)) * perCall;
+              combo = callQuery + '|' + index;
+              attempts++;
+            } while(localSeenCombos.has(combo) && attempts < 20);
+            localSeenCombos.add(combo);
+
+            const res = await fetch(PROXY_URL + '/deezer-search?q=' + encodeURIComponent(callQuery) + '&index=' + index + '&limit=' + perCall, {
+              headers: { 'x-app-key': PROXY_APP_KEY }
             });
-            addedAny = true;
-          });
+            if(!res.ok){
+              let detail = '';
+              try{ const errJson = await res.json(); detail = errJson.error || ''; }catch(e2){}
+              throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + ' (Query: ' + callQuery + ')');
+            }
+            const data = await res.json();
+            const items = (data.data || []).filter(t => t && t.id && t.preview);
+            items.forEach(t => {
+              pool.push({
+                id: 'dz_' + t.id,
+                source: 'deezer',
+                previewUrl: t.preview,
+                title: t.title,
+                artist: t.artist ? t.artist.name : 'Unbekannter Interpret',
+                artistKey: t.artist ? String(t.artist.id) : t.title,
+                cover: t.album ? (t.album.cover_medium || t.album.cover_small || '') : ''
+              });
+            });
 
-          picked = pickWithArtistCap(collected, desired, maxPerArtist);
-          if(picked.length >= desired) break;
-          if(!addedAny && data.total !== undefined && (index + perCall) >= data.total) continue;
-          fetchStatus.textContent = 'Suche Songs… (' + picked.length + '/' + desired + ', max. ' + maxPerArtist + ' je Interpret)';
+            fetchStatus.textContent = 'Suche Songs… (' + (genre || 'Auswahl') + ': ' + pool.length + ' gefunden)';
+            if(pool.length >= perCall * 3) break;
+          }
+          genrePools.push({ genre, pool });
+          collected.push(...pool);
         }
+
+        const buckets = genrePools.map(gp => ({ pool: gp.pool, target: perGenreTarget }));
+        picked = pickBalanced(buckets, maxPerArtist);
       }
+
+      // Ausgewogen über die Buckets gezogen, aber falls insgesamt mehr als gewünscht
+      // zusammengekommen ist (Rundung bei mehreren Genres), fair auf Zielgröße kürzen.
+      if(picked.length > desired) picked = shuffle(picked).slice(0, desired);
 
       if(collected.length === 0){
         fetchStatus.textContent = 'Keine Songs gefunden — andere Auswahl probieren.';
@@ -1458,7 +1513,6 @@
   const stealToggle = document.getElementById('stealToggle');
 
   let totalDeckSize = 0;
-  let trackStartedAt = null; // Zeitpunkt des ersten Play-Taps für den aktuellen Song (für Speed-Bonus)
 
   startGameBtn.onclick = () => {
     deck = shuffle(tracks.map((_,i)=>i));
@@ -1502,8 +1556,6 @@
     deckRemainingLabel.textContent = deck.length === 0 ? 'letzter Song' : deck.length + ' danach übrig';
     deckProgressFill.style.width = Math.round((songNumber / totalDeckSize) * 100) + '%';
 
-    trackStartedAt = null; // Speed-Bonus-Uhr für den neuen Song zurücksetzen
-
     labelTitle.textContent = ''; labelTitle.classList.remove('shown');
     labelArtist.textContent = ''; labelArtist.classList.remove('shown');
     vinyl.classList.remove('spin');
@@ -1539,7 +1591,7 @@
   }
 
   const deezerAudio = document.getElementById('deezerAudio');
-  deezerAudio.addEventListener('play', () => { isPlaying = true; if(trackStartedAt === null){ trackStartedAt = Date.now(); } updateTransportUI(); });
+  deezerAudio.addEventListener('play', () => { isPlaying = true; updateTransportUI(); });
   deezerAudio.addEventListener('pause', () => { isPlaying = false; updateTransportUI(); });
   deezerAudio.addEventListener('ended', () => { isPlaying = false; updateTransportUI(); });
 
@@ -1618,14 +1670,6 @@
       if(val === '2') basePts = 2; else if(val === '1a' || val === '1b') basePts = 1;
       const player = players[currentPlayerIdx];
 
-      // Speed-Bonus: nur wenn überhaupt Punkte verdient wurden, gemessen ab dem ersten Play-Tap.
-      let speedBonus = 0;
-      if(basePts > 0 && trackStartedAt){
-        const elapsedSec = (Date.now() - trackStartedAt) / 1000;
-        if(elapsedSec <= 5) speedBonus = 2;
-        else if(elapsedSec <= 10) speedBonus = 1;
-      }
-
       // Streak zählt nur bei "Beides richtig" hoch, jede andere Bewertung setzt ihn zurück.
       let streakBonus = 0;
       let justUnlockedSteal = false;
@@ -1659,11 +1703,10 @@
         }
       }
 
-      const total = basePts + speedBonus + streakBonus + stealAmount;
+      const total = basePts + streakBonus + stealAmount;
       player.score += total;
 
       const parts = [`Basis +${basePts}`];
-      if(speedBonus > 0) parts.push(`Speed +${speedBonus}`);
       if(streakBonus > 0) parts.push(`Streak 🔥${player.streak} +${streakBonus}`);
       if(stealAmount > 0) parts.push(`🥷 geklaut von ${stolenFrom} +${stealAmount}`);
       if(justUnlockedSteal) parts.push('🥷 Steal freigeschaltet für die nächste Chance!');
