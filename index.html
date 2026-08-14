@@ -485,6 +485,7 @@
     <input type="password" id="gatePasswordInput" placeholder="Zugangscode" autocomplete="off">
     <button class="btn-gold btn-block" id="gateUnlockBtn">Los geht's</button>
     <div class="gate-error" id="gateError"></div>
+    <div class="version-tag" style="margin-top:16px; text-align:center; font-family:var(--mono); font-size:11px; color:var(--slate); opacity:0.6;"></div>
   </div>
 </div>
 
@@ -493,6 +494,7 @@
   <div class="eyebrow">Party-Musikquiz</div>
   <h1 class="title">Plattenteller</h1>
   <p class="subtitle">Song läuft, Cover bleibt verdeckt. Wer errät zuerst Titel &amp; Interpret?</p>
+  <div class="version-tag" style="text-align:center; font-family:var(--mono); font-size:10px; color:var(--slate); opacity:0.5; margin-top:-6px; margin-bottom:14px;"></div>
 
   <div id="setup-screen">
 
@@ -712,6 +714,24 @@
 
 <script>
 (function(){
+  // Mobile Browser stellen die Seite beim "Neuladen" oder Tab-Wechsel oft aus dem
+  // Back-Forward-Cache (bfcache) wieder her, statt sie wirklich neu zu laden — dann bleibt
+  // man mitten im letzten Spielstand hängen. Bei einer bfcache-Wiederherstellung erzwingen
+  // wir deshalb einen echten Reload, damit man immer sauber auf dem Zugangs-/Setup-Screen landet.
+  window.addEventListener('pageshow', function(e){
+    if(e.persisted){ location.reload(); }
+  });
+})();
+</script>
+<script>
+(function(){
+  // ---------- APP VERSION ----------
+  // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
+  // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
+  // (z.B. nach einem Cache-Refresh am Handy).
+  const APP_VERSION = '2026-08-15.2';
+  document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
+
   // ---------- SIMPLE PASSWORD GATE ----------
   // Change this to whatever code you want people to enter. This is NOT real security —
   // just a simple lock to keep casual visitors out. Anyone who views the page source can see it.
