@@ -426,6 +426,7 @@
 
   .judge-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px;}
   .judge-grid button{padding:12px 8px; font-size:13px;}
+  .judge-grid button.judged:disabled{opacity:1; border-color:var(--gold) !important; color:var(--gold);}
 
   .empty-note{color:var(--slate); font-size:13px; font-style:italic; margin-top:8px;}
 
@@ -729,7 +730,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-08-15.2';
+  const APP_VERSION = '2026-09-25.1';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -788,15 +789,37 @@
 
   window.onSpotifyIframeApiReady = (IFrameAPI) => { spotifyIFrameAPI = IFrameAPI; };
 
+  // Wird der Controller nicht rechtzeitig bereit (iFrame-API lädt nicht, Netz hängt),
+  // bekommt man statt ewig "Bereit — Kassette antippen" einen Hinweis angezeigt.
+  const CONTROLLER_TIMEOUT_MS = 12000;
+  let controllerTimer = null;
+  let pendingUri = null; // zuletzt angeforderter Song, solange noch kein Controller existiert
+
   function ensureController(initialUri, cb){
     if(controller){ controller.loadUri(initialUri); cb && cb(); return; }
-    if(!spotifyIFrameAPI){ setTimeout(()=>ensureController(initialUri, cb), 300); return; }
+    const alreadyWaiting = pendingUri !== null;
+    pendingUri = initialUri;
+    if(alreadyWaiting) return; // nur eine Warteschleife — sonst entstehen mehrere Controller
+    clearTimeout(controllerTimer);
+    controllerTimer = setTimeout(() => {
+      if(controllerReady) return;
+      nowStatus.textContent = 'Spotify-Player lädt nicht — Internet prüfen oder Seite neu laden.';
+      console.warn('Spotify embed controller not ready after ' + CONTROLLER_TIMEOUT_MS + ' ms');
+    }, CONTROLLER_TIMEOUT_MS);
+    createControllerWhenApiReady(cb);
+  }
+
+  function createControllerWhenApiReady(cb){
+    if(!spotifyIFrameAPI){ setTimeout(() => createControllerWhenApiReady(cb), 300); return; }
     const element = document.getElementById('spotify-embed');
-    spotifyIFrameAPI.createController(element, { uri: initialUri, width: '100', height: '80' }, (EmbedController) => {
+    spotifyIFrameAPI.createController(element, { uri: pendingUri, width: '100', height: '80' }, (EmbedController) => {
       controller = EmbedController;
+      pendingUri = null;
       controller.addListener('ready', () => {
         if(controllerReady) return; // guard: 'ready' can fire again later, only act on the first time
         controllerReady = true;
+        clearTimeout(controllerTimer);
+        if(!isPlaying) nowStatus.textContent = 'Bereit — Kassette antippen'; // evtl. angezeigten Timeout-Hinweis zurücknehmen
         console.log('Spotify embed controller ready');
         cb && cb();
       });
@@ -920,7 +943,59 @@
       return true;
     }catch(err){
       console.error('Silent refresh failed:', err);
+      if(accessToken) showDisconnected('Verbindung zu Spotify verloren — bitte erneut verbinden.');
       return false;
+    }
+  }
+
+  // Nach einem Login-/Token-Fehler muss der Verbinden-Button wieder sichtbar sein,
+  // sonst kommt man ohne Seiten-Reload nicht mehr an Spotify ran.
+  function showDisconnected(message){
+    accessToken = null;
+    connectText.textContent = message;
+    connectDot.className = 'dot err';
+    connectHint.textContent = '';
+    connectBtn.style.display = '';
+  }
+
+  // Zentraler Spotify-API-Aufruf: erneuert bei 401 einmal das Token und wartet bei 429
+  // (Rate-Limit) die von Spotify per Retry-After vorgegebene Zeit ab, bevor erneut versucht wird.
+  const MAX_RATE_LIMIT_RETRIES = 4;
+  const MAX_RETRY_AFTER_SEC = 60;
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  async function spotifyApiJson(url, errSuffix, onWait){
+    let triedRefresh = false;
+    let rateLimitRetries = 0;
+    while(true){
+      const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+      if(res.status === 401 && !triedRefresh){
+        triedRefresh = true;
+        tokenObtainedAt = 0; // Token als abgelaufen markieren, damit wirklich erneuert wird
+        if(!(await ensureFreshToken())){
+          showDisconnected('Verbindung zu Spotify verloren — bitte erneut verbinden.');
+          throw new Error('Verbindung zu Spotify verloren — bitte oben erneut verbinden.');
+        }
+        continue;
+      }
+      if(res.status === 429 && rateLimitRetries < MAX_RATE_LIMIT_RETRIES){
+        const retryAfter = parseInt(res.headers.get('Retry-After'), 10);
+        // Header fehlt/ist nicht lesbar → exponentielles Backoff (1, 2, 4, 8 s)
+        const waitSec = Number.isFinite(retryAfter) ? Math.max(1, retryAfter) : 2 ** rateLimitRetries;
+        if(waitSec > MAX_RETRY_AFTER_SEC){
+          throw new Error('Spotify-Rate-Limit erreicht — bitte in ca. ' + Math.ceil(waitSec / 60) + ' Min. erneut versuchen.');
+        }
+        rateLimitRetries++;
+        onWait && onWait(waitSec);
+        await sleep(waitSec * 1000);
+        continue;
+      }
+      if(!res.ok){
+        let detail = '';
+        try{ const errJson = await res.json(); detail = errJson.error && errJson.error.message ? errJson.error.message : ''; }catch(e2){}
+        throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + (errSuffix || ''));
+      }
+      return res.json();
     }
   }
 
@@ -932,8 +1007,7 @@
     const errorParam = params.get('error');
 
     if(errorParam){
-      connectText.textContent = 'Spotify-Login abgebrochen oder fehlgeschlagen.';
-      connectDot.className = 'dot err';
+      showDisconnected('Spotify-Login abgebrochen oder fehlgeschlagen.');
       history.replaceState({}, '', window.location.pathname);
       return;
     }
@@ -951,8 +1025,10 @@
         connectBtn.style.display = 'none';
         searchPanel.style.display = 'block';
       }catch(err){
-        connectText.textContent = 'Verbindung fehlgeschlagen: ' + err.message;
-        connectDot.className = 'dot err';
+        // Der Code ist nur einmal gültig — aus der URL entfernen, damit ein Reload nicht erneut scheitert
+        history.replaceState({}, '', window.location.pathname);
+        showDisconnected('Verbindung fehlgeschlagen: ' + err.message);
+        searchPanel.style.display = 'none';
         console.error(err);
       }
       return;
@@ -1162,10 +1238,10 @@
       let picked = [];
 
       if(selectedSource === 'spotify'){
-        if(!accessToken){ fetchStatus.textContent = 'Nicht verbunden — bitte oben zuerst mit Spotify verbinden.'; return; }
-        await ensureFreshToken();
+        if(!accessToken || !(await ensureFreshToken())){ fetchStatus.textContent = 'Nicht verbunden — bitte oben zuerst mit Spotify verbinden.'; return; }
 
         const perCall = 10; // Spotify's search endpoint only allows limit 0-10
+        const batchSize = 3; // so viele Such-Calls parallel — klein genug, um Spotifys Rate-Limit nicht zu reizen
         const maxOffset = 300; // stay within reasonably relevant/known territory — deeper offsets surface very obscure results
         const totalMaxCalls = 30;
         const callsPerGenre = Math.max(3, Math.floor(totalMaxCalls / genreBuckets.length));
@@ -1182,33 +1258,29 @@
           const lowPool = [];
           const localSeenCombos = new Set();
 
-          for(let i = 0; i < callsPerGenre; i++){
-            const callQuery = buildSpotifyQuery(genre);
-            let offset, combo, attempts = 0;
-            do{
-              offset = Math.floor(Math.random() * (maxOffset / 10 + 1)) * 10;
-              combo = callQuery + '|' + offset;
-              attempts++;
-            } while(localSeenCombos.has(combo) && attempts < 20);
-            localSeenCombos.add(combo);
+          for(let i = 0; i < callsPerGenre; i += batchSize){
+            const calls = [];
+            for(let j = i; j < Math.min(i + batchSize, callsPerGenre); j++){
+              const callQuery = buildSpotifyQuery(genre);
+              let offset, combo, attempts = 0;
+              do{
+                offset = Math.floor(Math.random() * (maxOffset / 10 + 1)) * 10;
+                combo = callQuery + '|' + offset;
+                attempts++;
+              } while(localSeenCombos.has(combo) && attempts < 20);
+              localSeenCombos.add(combo);
+              calls.push({ callQuery, offset });
+            }
 
-            let res = await fetch('https://api.spotify.com/v1/search?q=' + encodeURIComponent(callQuery) + '&type=track&limit=' + perCall + '&offset=' + offset + '&market=DE', {
-              headers: { 'Authorization': 'Bearer ' + accessToken }
+            const results = await Promise.all(calls.map(c => spotifyApiJson(
+              'https://api.spotify.com/v1/search?q=' + encodeURIComponent(c.callQuery) + '&type=track&limit=' + perCall + '&offset=' + c.offset + '&market=DE',
+              ' (Query: ' + c.callQuery + ')',
+              sec => { fetchStatus.textContent = 'Spotify bremst (Rate-Limit) — warte ' + sec + ' s…'; }
+            )));
+            const rawItems = [];
+            results.forEach(data => {
+              if(data.tracks && data.tracks.items) rawItems.push(...data.tracks.items.filter(t => t && t.id));
             });
-            if(res.status === 401){
-              const refreshed = await ensureFreshToken();
-              if(!refreshed){ fetchStatus.textContent = 'Verbindung zu Spotify verloren — bitte oben erneut verbinden.'; return; }
-              res = await fetch('https://api.spotify.com/v1/search?q=' + encodeURIComponent(callQuery) + '&type=track&limit=' + perCall + '&offset=' + offset + '&market=DE', {
-                headers: { 'Authorization': 'Bearer ' + accessToken }
-              });
-            }
-            if(!res.ok){
-              let detail = '';
-              try{ const errJson = await res.json(); detail = errJson.error && errJson.error.message ? errJson.error.message : ''; }catch(e2){}
-              throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + ' (Query: ' + callQuery + ')');
-            }
-            const data = await res.json();
-            const rawItems = (data.tracks && data.tracks.items) ? data.tracks.items.filter(t => t && t.id) : [];
 
             rawItems.forEach(t => {
               const mapped = {
@@ -1355,35 +1427,31 @@
     const pool = [];
     let url = 'https://api.spotify.com/v1/playlists/' + playlistId + '/items?limit=100&fields=next,items(track(id,uri,name,popularity,artists(id,name),album(images)))';
     let pageCount = 0;
+    let skippedNonLatin = 0;
     while(url && pageCount < 20){ // safety cap: up to 2000 tracks
-      let res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-      if(res.status === 401){
-        const refreshed = await ensureFreshToken();
-        if(!refreshed) throw new Error('Verbindung zu Spotify verloren — bitte oben erneut verbinden.');
-        res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-      }
-      if(!res.ok){
-        let detail = '';
-        try{ const errJson = await res.json(); detail = errJson.error && errJson.error.message ? errJson.error.message : ''; }catch(e2){}
-        throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + ' — ist die Playlist öffentlich?');
-      }
-      const data = await res.json();
+      const data = await spotifyApiJson(url, ' — ist die Playlist öffentlich?', sec => {
+        playlistImportStatus.textContent = 'Spotify bremst (Rate-Limit) — warte ' + sec + ' s…';
+      });
       (data.items || []).forEach(item => {
         const t = item.track;
         if(!t || !t.id) return;
+        const artist = (t.artists || []).map(a => a.name).join(', ');
+        if(hasNonLatinScript(t.name) || hasNonLatinScript(artist)){ skippedNonLatin++; return; } // wie bei der Suche: nicht lesbar/erratbar
         pool.push({
           id: 'sp_' + t.id,
           source: 'spotify',
           uri: t.uri,
           title: t.name,
-          artist: t.artists.map(a => a.name).join(', '),
+          artist: artist,
           artistKey: t.artists[0] ? t.artists[0].id : t.artists.map(a=>a.name).join(','),
           cover: (t.album && t.album.images && t.album.images.length) ? t.album.images[t.album.images.length > 2 ? 1 : 0].url : ''
         });
       });
       url = data.next;
       pageCount++;
+      playlistImportStatus.textContent = 'Lade Playlist… (' + pool.length + ' Songs)';
     }
+    if(skippedNonLatin) console.log('Playlist-Import: ' + skippedNonLatin + ' Songs mit nicht-lateinischer Schrift übersprungen');
     return pool;
   }
 
@@ -1405,7 +1473,7 @@
     playlistImportStatus.textContent = 'Lade Playlist…';
     reshufflePlaylistBtn.style.display = 'none';
     try{
-      await ensureFreshToken();
+      if(!(await ensureFreshToken())){ playlistImportStatus.textContent = 'Nicht verbunden — bitte oben zuerst mit Spotify verbinden.'; return; }
       importedPlaylistPool = await fetchPlaylistTracks(id);
       if(importedPlaylistPool.length === 0){
         playlistImportStatus.textContent = 'Keine Songs in dieser Playlist gefunden.';
@@ -1447,9 +1515,22 @@
     const id = extractTrackId(url);
     if(!id){ fetchStatus.textContent = 'Das sieht nicht nach einem gültigen open.spotify.com/track/-Link aus.'; return; }
     const title = trackTitleInput.value.trim() || 'Unbekannter Titel';
-    const artist = trackArtistInput.value.trim() || 'Unbekannter Interpret';
+    const artistInput = trackArtistInput.value.trim();
+    const artist = artistInput || 'Unbekannter Interpret';
     const funFact = trackFunFactInput.value.trim() || null;
-    tracks.push({ id: 'sp_' + id, source: 'spotify', uri: 'spotify:track:' + id, title, artist, artistKey: artist, cover: lastFetchedCover, funFact });
+    // Normalisierter Name als artistKey, damit "ABBA" und "abba " als derselbe Interpret zählen.
+    // Ohne Interpret-Angabe kein Limit (sonst wären max. 2 "unbekannte" Songs möglich).
+    const artistKey = artistInput ? (normalize(artistInput) || artistInput.toLowerCase()) : 'manual_' + id;
+    if(artistInput){
+      const maxPerArtist = 2;
+      // Such-/Playlist-Songs haben die Spotify-Artist-ID als Key — daher zusätzlich über den ersten Interpretennamen vergleichen
+      const sameArtistCount = tracks.filter(t => t.artistKey === artistKey || normalize((t.artist || '').split(', ')[0]) === artistKey).length;
+      if(sameArtistCount >= maxPerArtist){
+        fetchStatus.textContent = 'Von „' + artist + '“ sind schon ' + maxPerArtist + ' Songs im Stapel (max. ' + maxPerArtist + ' je Interpret).';
+        return;
+      }
+    }
+    tracks.push({ id: 'sp_' + id, source: 'spotify', uri: 'spotify:track:' + id, title, artist, artistKey, cover: lastFetchedCover, funFact });
     trackUrlInput.value = ''; trackTitleInput.value = ''; trackArtistInput.value = ''; trackFunFactInput.value = '';
     lastFetchedCover = '';
     renderTracks();
@@ -1543,7 +1624,35 @@
   const stealBox = document.getElementById('stealBox');
   const stealToggle = document.getElementById('stealToggle');
 
+  const judgeButtons = document.querySelectorAll('.judge-grid button[data-score]');
+
   let totalDeckSize = 0;
+  let roundJudged = false; // pro Runde nur eine Bewertung — verhindert doppelte Punkte per Doppelklick
+
+  // ---------- WAKE LOCK ----------
+  // Hält während des Spiels den Bildschirm an, damit sich das Handy nicht sperrt.
+  // Der Browser gibt den Lock beim Tab-Wechsel/Sperren selbst frei → bei Rückkehr neu anfordern.
+  let wakeLock = null;
+  let wakeLockWanted = false;
+  async function requestWakeLock(){
+    wakeLockWanted = true;
+    if(!('wakeLock' in navigator) || wakeLock) return;
+    try{
+      const lock = await navigator.wakeLock.request('screen');
+      if(!wakeLockWanted){ lock.release().catch(() => {}); return; } // Spiel inzwischen beendet
+      wakeLock = lock;
+      wakeLock.addEventListener('release', () => { if(wakeLock === lock) wakeLock = null; });
+    }catch(err){
+      console.warn('Wake Lock nicht verfügbar:', err);
+    }
+  }
+  function releaseWakeLock(){
+    wakeLockWanted = false;
+    if(wakeLock){ wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if(wakeLockWanted && document.visibilityState === 'visible') requestWakeLock();
+  });
 
   startGameBtn.onclick = () => {
     deck = shuffle(tracks.map((_,i)=>i));
@@ -1552,6 +1661,7 @@
     setupScreen.style.display = 'none';
     gameScreen.style.display = 'block';
     endScreen.style.display = 'none';
+    requestWakeLock();
     loadNextTrack();
     renderScoreboard();
   };
@@ -1598,6 +1708,9 @@
     guessPanel.style.display = 'block';
     revealPanel.style.display = 'none';
     roundBonusNote.textContent = '';
+    roundJudged = false;
+    judgeButtons.forEach(b => { b.disabled = false; b.classList.remove('judged'); });
+    nextRoundBtn.disabled = true; // erst nach der Bewertung weiter
 
     const currentPlayer = players[currentPlayerIdx];
     const canSteal = currentPlayer && currentPlayer.stealAvailable && !currentPlayer.stealUsed;
@@ -1637,7 +1750,11 @@
     if(t.source === 'deezer'){
       if(isPlaying){ deezerAudio.pause(); } else { deezerAudio.play().catch(err => console.error('Deezer playback error:', err)); }
     } else {
-      if(!controller){ console.warn('Play clicked but no controller yet'); return; }
+      if(!controller){
+        console.warn('Play clicked but no controller yet');
+        nowStatus.textContent = 'Spotify-Player lädt noch — kurz warten und nochmal antippen.';
+        return;
+      }
       if(isPlaying){ controller.pause(); } else { controller.play(); }
     }
   }
@@ -1694,8 +1811,13 @@
     return 0;
   }
 
-  document.querySelectorAll('.judge-grid button[data-score]').forEach(btn => {
+  judgeButtons.forEach(btn => {
     btn.addEventListener('click', () => {
+      if(roundJudged) return;
+      roundJudged = true;
+      judgeButtons.forEach(b => { b.disabled = true; });
+      btn.classList.add('judged'); // gewählte Bewertung bleibt sichtbar markiert
+      nextRoundBtn.disabled = false;
       const val = btn.getAttribute('data-score');
       let basePts = 0;
       if(val === '2') basePts = 2; else if(val === '1a' || val === '1b') basePts = 1;
@@ -1748,12 +1870,14 @@
   });
 
   nextRoundBtn.onclick = () => {
+    if(!roundJudged) return;
     currentPlayerIdx = (currentPlayerIdx + 1) % players.length;
     renderScoreboard();
     loadNextTrack();
   };
 
   function showEndScreen(){
+    releaseWakeLock();
     gameScreen.style.display = 'none';
     endScreen.style.display = 'block';
     const finalList = document.getElementById('finalList');
@@ -1781,6 +1905,7 @@
     if(!confirm('Spiel wirklich abbrechen und zu den Einstellungen zurück? Der Punktestand geht dabei verloren.')) return;
     if(controller) controller.pause();
     deezerAudio.pause();
+    releaseWakeLock();
     players.forEach(p => { p.score = 0; p.streak = 0; p.stealAvailable = false; p.stealUsed = false; });
     gameScreen.style.display = 'none';
     endScreen.style.display = 'none';
