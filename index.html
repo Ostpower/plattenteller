@@ -550,7 +550,7 @@
       <details class="advanced" open>
         <summary>Spotify-Playlist importieren</summary>
         <p class="hint" style="margin-top:10px;">
-          Link zu einer öffentlichen Spotify-Playlist einfügen, oder eine der offiziellen HITSTER-Playlists unten anklicken — die App holt alle Songs daraus, wendet die Interpret-Begrenzung an und wählt zufällig die gewünschte Anzahl aus.
+          Link zu einer <strong>eigenen</strong> öffentlichen Spotify-Playlist einfügen (fremde Playlists sperrt Spotify — vorher in Spotify als neue Playlist kopieren), oder eine der offiziellen HITSTER-Playlists unten anklicken — die App holt alle Songs daraus, wendet die Interpret-Begrenzung an und wählt zufällig die gewünschte Anzahl aus.
         </p>
         <label>Schnellauswahl: offizielle HITSTER-Playlists</label>
         <div class="pick-group" id="hitsterPresetChips" style="margin-bottom:14px;">
@@ -730,7 +730,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-09-25.1';
+  const APP_VERSION = '2026-09-26.1';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -993,7 +993,9 @@
       if(!res.ok){
         let detail = '';
         try{ const errJson = await res.json(); detail = errJson.error && errJson.error.message ? errJson.error.message : ''; }catch(e2){}
-        throw new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + (errSuffix || ''));
+        const err = new Error('HTTP ' + res.status + (detail ? ' – ' + detail : '') + (errSuffix || ''));
+        err.status = res.status;
+        throw err;
       }
       return res.json();
     }
@@ -1425,16 +1427,20 @@
 
   async function fetchPlaylistTracks(playlistId){
     const pool = [];
-    let url = 'https://api.spotify.com/v1/playlists/' + playlistId + '/items?limit=100&fields=next,items(track(id,uri,name,popularity,artists(id,name),album(images)))';
+    // Spotify liefert den Song seit 2026 im Feld "item" — "track" ist veraltet und kommt ggf. nicht mehr.
+    // Beide anfragen, damit es auch mit älteren Antworten funktioniert.
+    const trackFields = 'type,id,uri,name,popularity,artists(id,name),album(images)';
+    let url = 'https://api.spotify.com/v1/playlists/' + playlistId + '/items?limit=100&fields=next,items(item(' + trackFields + '),track(' + trackFields + '))';
     let pageCount = 0;
     let skippedNonLatin = 0;
     while(url && pageCount < 20){ // safety cap: up to 2000 tracks
-      const data = await spotifyApiJson(url, ' — ist die Playlist öffentlich?', sec => {
+      const data = await spotifyApiJson(url, '', sec => {
         playlistImportStatus.textContent = 'Spotify bremst (Rate-Limit) — warte ' + sec + ' s…';
       });
-      (data.items || []).forEach(item => {
-        const t = item.track;
+      (data.items || []).forEach(entry => {
+        const t = entry.item || entry.track;
         if(!t || !t.id) return;
+        if(t.type && t.type !== 'track') return; // Podcast-Episoden o.ä. überspringen
         const artist = (t.artists || []).map(a => a.name).join(', ');
         if(hasNonLatinScript(t.name) || hasNonLatinScript(artist)){ skippedNonLatin++; return; } // wie bei der Suche: nicht lesbar/erratbar
         pool.push({
@@ -1481,7 +1487,9 @@
       }
       sampleFromImportedPool();
     }catch(err){
-      playlistImportStatus.textContent = 'Fehler: ' + err.message;
+      playlistImportStatus.textContent = err.status === 403
+        ? 'Spotify gibt nur eigene Playlists frei. In Spotify: Songs markieren (Strg+A) → Rechtsklick → Zur Playlist hinzufügen → Neue Playlist, dann den Link dieser Kopie einfügen.'
+        : 'Fehler: ' + err.message;
       console.error('Playlist import error:', err);
     }
   };
