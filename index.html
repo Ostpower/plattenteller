@@ -475,6 +475,20 @@
   .gate-box p{color:var(--slate); font-size:13.5px; margin-bottom:20px;}
   .gate-box input{text-align:center; letter-spacing:0.1em; margin-bottom:10px;}
   .gate-error{color:var(--coral); font-size:12.5px; min-height:16px; margin-top:2px;}
+
+  /* ---------- MULTIPLAYER (Firebase) ---------- */
+  .room-code{font-family:var(--display); font-size:64px; letter-spacing:0.18em; color:var(--gold); text-align:center; line-height:1; margin:6px 0 12px; padding-left:0.18em;}
+  .qr-box{background:#fff; border-radius:12px; padding:8px; width:fit-content; margin:0 auto 12px;}
+  .qr-box svg{display:block; width:176px; height:176px;}
+  .room-link{font-family:var(--mono); font-size:11.5px; color:var(--slate); text-align:center; word-break:break-all; margin-bottom:14px;}
+  .mp-player{display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--groove); border-radius:10px; margin-bottom:6px; font-size:14px;}
+  .mp-player.me{border:1px solid var(--gold);}
+  .mp-player .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .mp-player .mp-kick{background:rgba(232,80,58,0.15); color:var(--coral); border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:15px; line-height:1;}
+  .mp-msg{min-height:18px; font-size:12.5px; margin-top:8px; color:var(--slate);}
+  .mp-msg.err{color:var(--coral);}
+  .mp-actions{display:flex; gap:10px; margin-bottom:16px;}
+  .mp-actions button{flex:1;}
 </style>
 </head>
 <body>
@@ -486,6 +500,11 @@
     <input type="password" id="gatePasswordInput" placeholder="Zugangscode" autocomplete="off">
     <button class="btn-gold btn-block" id="gateUnlockBtn">Los geht's</button>
     <div class="gate-error" id="gateError"></div>
+    <div style="margin-top:18px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.08);">
+      <p style="margin-bottom:10px;">Oder als Mitspieler beitreten:</p>
+      <input type="text" id="gateJoinInput" placeholder="Raumcode" maxlength="4" autocomplete="off" style="text-transform:uppercase;">
+      <button class="btn-ghost btn-block" id="gateJoinBtn">Raum beitreten</button>
+    </div>
     <div class="version-tag" style="margin-top:16px; text-align:center; font-family:var(--mono); font-size:11px; color:var(--slate); opacity:0.6;"></div>
   </div>
 </div>
@@ -606,6 +625,25 @@
         <div class="pick-chip" data-mode="together">Zusammen</div>
       </div>
       <p class="hint" id="modeHint" style="margin-top:-8px;">Reihenfolge: einer ist abwechselnd dran, mit Streak-Bonus &amp; Klau-Powerup. Zusammen: alle hören denselben Song und tippen parallel (eigenes Handy oder mündlich/Zettel — jede*r wird danach einzeln bewertet, kein Streak/Klau).</p>
+    </div>
+
+    <div class="panel" id="mpHostPanel">
+      <h2>4. Mehrere Handys (Beta)</h2>
+      <p class="hint">Jeder spielt mit dem eigenen Handy: Raum erstellen, Code oder QR zeigen, Mitspieler treten bei. Aktuell nur die Lobby — das Raten über die Handys kommt im nächsten Schritt.</p>
+      <button class="btn-gold" id="mpCreateBtn">Raum erstellen</button>
+      <div id="mpRoomBox" style="display:none;">
+        <label>Raumcode</label>
+        <div class="room-code" id="mpRoomCode"></div>
+        <div class="qr-box" id="mpQr"></div>
+        <div class="room-link" id="mpRoomLink"></div>
+        <div class="mp-actions">
+          <button class="btn-ghost" id="mpCopyBtn">Link kopieren</button>
+          <button class="btn-ghost" id="mpCloseBtn">Raum schließen</button>
+        </div>
+        <label>Verbundene Spieler (<span id="mpCount">0</span>)</label>
+        <div id="mpPlayerList"></div>
+      </div>
+      <div class="mp-msg" id="mpHostMsg"></div>
     </div>
 
     <button class="btn-coral btn-block" id="startGameBtn" style="padding:15px; font-size:15px;" disabled>Spiel starten</button>
@@ -743,6 +781,29 @@
   <audio id="deezerAudio" preload="none"></audio>
 </div>
 
+<div class="wrap" id="playerView" style="display:none;">
+  <div class="eyebrow">Party-Musikquiz</div>
+  <h1 class="title">Plattenteller</h1>
+  <p class="subtitle">Du spielst mit deinem eigenen Handy mit.</p>
+  <div class="version-tag" style="text-align:center; font-family:var(--mono); font-size:10px; color:var(--slate); opacity:0.5; margin-top:-6px; margin-bottom:14px;"></div>
+
+  <div class="panel" id="pvJoinPanel">
+    <h2>Raum <span id="pvRoomCode" style="color:var(--gold);"></span></h2>
+    <p class="hint">Wie sollen wir dich nennen?</p>
+    <input type="text" id="pvNameInput" placeholder="Dein Name…" maxlength="18" autocomplete="off">
+    <button class="btn-gold btn-block" id="pvJoinBtn" style="margin-top:10px;">Beitreten</button>
+    <div class="mp-msg" id="pvJoinMsg"></div>
+  </div>
+
+  <div class="panel" id="pvLobbyPanel" style="display:none;">
+    <h2>Du bist dabei, <span id="pvMyName" style="color:var(--gold);"></span>!</h2>
+    <p class="hint" id="pvLobbyHint">Warte, bis der Host das Spiel startet…</p>
+    <label>Im Raum (<span id="pvCount">0</span>)</label>
+    <div id="pvPlayerList"></div>
+    <button class="btn-ghost btn-block" id="pvLeaveBtn" style="margin-top:12px;">Raum verlassen</button>
+  </div>
+</div>
+
 <script>
 (function(){
   // Mobile Browser stellen die Seite beim "Neuladen" oder Tab-Wechsel oft aus dem
@@ -760,7 +821,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-09-26.2';
+  const APP_VERSION = '2026-10-10.1';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -774,6 +835,13 @@
   const gatePasswordInput = document.getElementById('gatePasswordInput');
   const gateUnlockBtn = document.getElementById('gateUnlockBtn');
   const gateError = document.getElementById('gateError');
+
+  // Beitritts-Links (?join=CODE) zeigen nur die Mitspieler-Ansicht (siehe Multiplayer-Block unten) —
+  // dort gibt es kein Setup, deshalb braucht es keinen Zugangscode.
+  if(new URLSearchParams(window.location.search).has('join')){
+    gateOverlay.style.display = 'none';
+    return;
+  }
 
   function unlockApp(){
     gateOverlay.style.display = 'none';
@@ -2105,5 +2173,380 @@
 
 })();
 </script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(function(){
+  // ---------- MULTIPLAYER (Firebase Realtime Database) — Phase 2: Lobby ----------
+  // Host erstellt einen Raum, Spieler treten per Link/QR/Code mit dem eigenen Handy bei.
+  // Die Web-Config von Firebase ist NICHT geheim (wie die Spotify Client ID) — der Schutz
+  // läuft über die Security Rules in der Firebase Console, siehe docs/firebase-multiplayer-plan.md.
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDOfrXkOnOipN65SrnwjYhBMJj5L1Gz6w0",
+    authDomain: "plattenteller-80cd8.firebaseapp.com",
+    databaseURL: "https://plattenteller-80cd8-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "plattenteller-80cd8",
+    storageBucket: "plattenteller-80cd8.firebasestorage.app",
+    messagingSenderId: "1078647752297",
+    appId: "1:1078647752297:web:386af8a989f1bd124a04f8"
+  };
+  const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // ohne I/O/0/1 — weniger Verwechslungen
+  const HOST_ROOM_KEY = 'plattenteller_host_room';
+  const PLAYER_NAME_KEY = 'plattenteller_player_name';
+
+  const $ = id => document.getElementById(id);
+  const pageParams = new URLSearchParams(window.location.search);
+  const isJoinLink = pageParams.has('join');
+  const JOIN_CODE = (pageParams.get('join') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+
+  let db = null, auth = null, authPromise = null;
+
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function initFb(){
+    if(db) return true;
+    if(typeof firebase === 'undefined' || !firebase.database || !firebase.auth) return false;
+    try{
+      if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      auth = firebase.auth();
+      db = firebase.database();
+      return true;
+    }catch(e){ console.error(e); return false; }
+  }
+
+  // Jedes Gerät bekommt automatisch eine anonyme, stabile ID (bleibt im Browser gespeichert).
+  function ensureAuth(){
+    if(authPromise) return authPromise;
+    authPromise = new Promise((resolve, reject) => {
+      let signingIn = false, done = false;
+      auth.onAuthStateChanged(user => {
+        if(done) return;
+        if(user){ done = true; resolve(user.uid); }
+        else if(!signingIn){ signingIn = true; auth.signInAnonymously().catch(err => { done = true; reject(err); }); }
+      });
+    });
+    authPromise.catch(() => { authPromise = null; }); // nächster Versuch darf neu starten
+    return authPromise;
+  }
+
+  function friendlyError(e){
+    const code = (e && e.code) || '';
+    const msg = (e && e.message) || String(e);
+    if(code === 'auth/operation-not-allowed' || code === 'auth/admin-restricted-operation') return 'Anonyme Anmeldung ist in Firebase nicht aktiviert (Authentication → Anmeldemethode → Anonym).';
+    if(code === 'auth/unauthorized-domain') return 'Diese Domain ist in Firebase nicht autorisiert (Authentication → Einstellungen → Autorisierte Domains).';
+    if(code === 'auth/network-request-failed') return 'Keine Verbindung zu Firebase.';
+    if(/PERMISSION_DENIED/i.test(code + ' ' + msg)) return 'Keine Berechtigung — sind die Firebase-Regeln (Realtime Database → Regeln) veröffentlicht?';
+    return msg;
+  }
+
+  function randomCode(){
+    const a = new Uint32Array(4);
+    crypto.getRandomValues(a);
+    let s = '';
+    for(let i = 0; i < 4; i++) s += CODE_ALPHABET[a[i] % CODE_ALPHABET.length];
+    return s;
+  }
+
+  function joinUrl(code){ return window.location.origin + window.location.pathname + '?join=' + code; }
+
+  function qrSvg(text){
+    const qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    const n = qr.getModuleCount(), m = 2;
+    let d = '';
+    for(let r = 0; r < n; r++){
+      for(let c = 0; c < n; c++){
+        if(qr.isDark(r, c)) d += 'M' + (c + m) + ' ' + (r + m) + 'h1v1h-1z';
+      }
+    }
+    const size = n + 2 * m;
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + size + ' ' + size + '" shape-rendering="crispEdges"><path d="' + d + '" fill="#000"/></svg>';
+  }
+
+  // Spieler-Knoten ohne Namen (z. B. Rest nach dem Entfernen) werden ignoriert.
+  function playersFromSnap(snap){
+    const out = [];
+    snap.forEach(ch => {
+      const v = ch.val() || {};
+      if(v.name) out.push({ uid: ch.key, name: v.name, connected: !!v.connected, joinedAt: v.joinedAt || 0 });
+    });
+    out.sort((a, b) => a.joinedAt - b.joinedAt);
+    return out;
+  }
+
+  function dot(on){
+    return '<span class="dot' + (on ? ' ok' : '') + '"></span>';
+  }
+
+  // =====================================================================
+  // HOST
+  // =====================================================================
+  const mpCreateBtn = $('mpCreateBtn'), mpRoomBox = $('mpRoomBox'), mpRoomCode = $('mpRoomCode');
+  const mpQr = $('mpQr'), mpRoomLink = $('mpRoomLink'), mpCopyBtn = $('mpCopyBtn'), mpCloseBtn = $('mpCloseBtn');
+  const mpCount = $('mpCount'), mpPlayerList = $('mpPlayerList'), mpHostMsg = $('mpHostMsg');
+
+  let hostCode = null, hostPlayersRef = null, hostPlayersCb = null, hostInfoRef = null, hostInfoCb = null;
+
+  function hostMsg(text, isErr){ mpHostMsg.textContent = text || ''; mpHostMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
+
+  function renderHostRoom(code){
+    const url = joinUrl(code);
+    mpRoomCode.textContent = code;
+    mpRoomLink.textContent = url;
+    try{ mpQr.innerHTML = qrSvg(url); mpQr.style.display = 'block'; }
+    catch(e){ mpQr.style.display = 'none'; console.warn('QR-Code nicht verfügbar', e); }
+    mpRoomBox.style.display = 'block';
+    mpCreateBtn.style.display = 'none';
+  }
+
+  function detachHost(){
+    if(hostPlayersRef && hostPlayersCb) hostPlayersRef.off('value', hostPlayersCb);
+    if(hostInfoRef && hostInfoCb) hostInfoRef.off('value', hostInfoCb);
+    hostPlayersRef = hostPlayersCb = hostInfoRef = hostInfoCb = null;
+  }
+
+  function attachHostRoom(code){
+    detachHost();
+    hostCode = code;
+    try{ localStorage.setItem(HOST_ROOM_KEY, code); }catch(e){}
+    renderHostRoom(code);
+
+    hostPlayersRef = db.ref('rooms/' + code + '/players');
+    hostPlayersCb = hostPlayersRef.on('value', snap => {
+      const list = playersFromSnap(snap);
+      mpCount.textContent = list.length;
+      mpPlayerList.innerHTML = list.length
+        ? list.map(p => '<div class="mp-player">' + dot(p.connected) + '<span class="nm">' + esc(p.name) + '</span><button class="mp-kick" data-uid="' + esc(p.uid) + '" title="Entfernen">×</button></div>').join('')
+        : '<p class="hint" style="margin:6px 0 0;">Noch niemand da — Code oder QR zeigen.</p>';
+    });
+
+    // Host-Präsenz: Spieler sehen, wenn der Host kurz offline ist.
+    const hc = db.ref('rooms/' + code + '/meta/hostConnected');
+    hostInfoRef = db.ref('.info/connected');
+    hostInfoCb = hostInfoRef.on('value', s => {
+      if(s.val() === true){ hc.onDisconnect().set(false); hc.set(true); }
+    });
+  }
+
+  async function createRoom(){
+    hostMsg('');
+    if(!initFb()){ hostMsg('Firebase konnte nicht geladen werden (Internetverbindung?).', true); return; }
+    mpCreateBtn.disabled = true;
+    try{
+      const myUid = await ensureAuth();
+      let code = null;
+      for(let i = 0; i < 8 && !code; i++){
+        const c = randomCode();
+        const s = await db.ref('rooms/' + c + '/meta').once('value');
+        if(!s.exists()) code = c;
+      }
+      if(!code) throw new Error('Kein freier Raumcode gefunden, bitte nochmal versuchen.');
+      await db.ref('rooms/' + code + '/meta').set({
+        hostUid: myUid,
+        createdAt: firebase.database.ServerValue.TIMESTAMP,
+        phase: 'lobby',
+        mode: 'sequential',
+        hostConnected: true
+      });
+      attachHostRoom(code);
+    }catch(e){
+      console.error(e);
+      hostMsg('Raum konnte nicht erstellt werden: ' + friendlyError(e), true);
+    }finally{
+      mpCreateBtn.disabled = false;
+    }
+  }
+
+  // Nach einem Neuladen (z. B. Handy-Bildschirm war aus) den eigenen Raum wieder aufnehmen.
+  async function resumeHostRoom(){
+    let code = null;
+    try{ code = localStorage.getItem(HOST_ROOM_KEY); }catch(e){}
+    if(!code || !initFb()) return;
+    try{
+      const myUid = await ensureAuth();
+      const s = await db.ref('rooms/' + code + '/meta').once('value');
+      const m = s.val();
+      if(m && m.hostUid === myUid && m.phase !== 'ended') attachHostRoom(code);
+      else { try{ localStorage.removeItem(HOST_ROOM_KEY); }catch(e){} }
+    }catch(e){ console.warn('Raum konnte nicht wiederhergestellt werden', e); }
+  }
+
+  async function closeRoom(){
+    if(!hostCode) return;
+    if(!window.confirm('Raum wirklich schließen? Alle Mitspieler werden getrennt.')) return;
+    const code = hostCode;
+    try{ await db.ref('rooms/' + code + '/meta/phase').set('ended'); }
+    catch(e){ console.warn(e); }
+    detachHost();
+    hostCode = null;
+    try{ localStorage.removeItem(HOST_ROOM_KEY); }catch(e){}
+    mpRoomBox.style.display = 'none';
+    mpCreateBtn.style.display = '';
+    hostMsg('Raum ' + code + ' geschlossen.');
+  }
+
+  async function copyLink(){
+    const url = joinUrl(hostCode);
+    try{
+      await navigator.clipboard.writeText(url);
+      hostMsg('Link kopiert ✓');
+    }catch(e){
+      hostMsg('Kopieren nicht möglich — Link oben markieren und kopieren.', true);
+    }
+  }
+
+  mpCreateBtn.addEventListener('click', createRoom);
+  mpCloseBtn.addEventListener('click', closeRoom);
+  mpCopyBtn.addEventListener('click', copyLink);
+  mpPlayerList.addEventListener('click', e => {
+    const btn = e.target.closest('.mp-kick');
+    if(!btn || !hostCode || !db) return;
+    db.ref('rooms/' + hostCode + '/players/' + btn.getAttribute('data-uid')).remove().catch(err => hostMsg(friendlyError(err), true));
+  });
+
+  // =====================================================================
+  // SPIELER (Beitritts-Link ?join=CODE)
+  // =====================================================================
+  const pvView = $('playerView'), pvJoinPanel = $('pvJoinPanel'), pvLobbyPanel = $('pvLobbyPanel');
+  const pvRoomCode = $('pvRoomCode'), pvNameInput = $('pvNameInput'), pvJoinBtn = $('pvJoinBtn'), pvJoinMsg = $('pvJoinMsg');
+  const pvMyName = $('pvMyName'), pvLobbyHint = $('pvLobbyHint'), pvCount = $('pvCount'), pvPlayerList = $('pvPlayerList'), pvLeaveBtn = $('pvLeaveBtn');
+
+  let pvUid = null, pvDetach = null;
+
+  function pvMsg(text, isErr){ pvJoinMsg.textContent = text || ''; pvJoinMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
+
+  function showJoinPanel(message, isErr){
+    pvLobbyPanel.style.display = 'none';
+    pvJoinPanel.style.display = 'block';
+    pvMsg(message, isErr);
+  }
+
+  function enterLobby(name){
+    if(pvDetach) pvDetach();
+    const base = 'rooms/' + JOIN_CODE;
+    const pRef = db.ref(base + '/players/' + pvUid);
+    const connRef = pRef.child('connected');
+    const playersRef = db.ref(base + '/players');
+    const metaRef = db.ref(base + '/meta');
+    const infoRef = db.ref('.info/connected');
+
+    pvMyName.textContent = name;
+    pvJoinPanel.style.display = 'none';
+    pvLobbyPanel.style.display = 'block';
+
+    const infoCb = infoRef.on('value', s => {
+      if(s.val() === true){ connRef.onDisconnect().set(false); connRef.set(true).catch(() => {}); }
+    });
+
+    let seenMe = false;
+    const playersCb = playersRef.on('value', snap => {
+      const list = playersFromSnap(snap);
+      const me = list.some(p => p.uid === pvUid);
+      if(me) seenMe = true;
+      else if(seenMe){ pvDetach(); showJoinPanel('Du wurdest vom Host entfernt.', true); return; }
+      pvCount.textContent = list.length;
+      pvPlayerList.innerHTML = list.map(p =>
+        '<div class="mp-player' + (p.uid === pvUid ? ' me' : '') + '">' + dot(p.connected) + '<span class="nm">' + esc(p.name) + '</span></div>'
+      ).join('');
+    });
+
+    const metaCb = metaRef.on('value', s => {
+      const m = s.val();
+      if(!m || m.phase === 'ended'){ pvDetach(); showJoinPanel('Der Host hat den Raum geschlossen.', true); return; }
+      if(m.hostConnected === false) pvLobbyHint.textContent = 'Der Host ist gerade offline — einen Moment…';
+      else if(m.phase === 'playing') pvLobbyHint.textContent = 'Das Spiel läuft. (Raten übers Handy kommt im nächsten Update.)';
+      else pvLobbyHint.textContent = 'Warte, bis der Host das Spiel startet…';
+    });
+
+    pvDetach = function(){
+      infoRef.off('value', infoCb);
+      playersRef.off('value', playersCb);
+      metaRef.off('value', metaCb);
+      connRef.onDisconnect().cancel().catch(() => {});
+      pvDetach = null;
+    };
+  }
+
+  async function pvJoin(){
+    const name = pvNameInput.value.trim().slice(0, 18);
+    if(!name){ pvMsg('Bitte einen Namen eingeben.', true); return; }
+    pvJoinBtn.disabled = true;
+    pvMsg('Verbinde…');
+    try{
+      if(!initFb()) throw new Error('Firebase konnte nicht geladen werden (Internetverbindung?).');
+      pvUid = await ensureAuth();
+      const base = 'rooms/' + JOIN_CODE;
+      const metaSnap = await db.ref(base + '/meta').once('value');
+      if(!metaSnap.exists()) throw new Error('Raum nicht gefunden — Code prüfen.');
+      const meta = metaSnap.val();
+      if(meta.phase === 'ended') throw new Error('Dieser Raum ist geschlossen.');
+      const pRef = db.ref(base + '/players/' + pvUid);
+      const existing = await pRef.once('value');
+      if(existing.exists()){
+        await pRef.update({ name: name, connected: true });
+      }else{
+        if(meta.phase !== 'lobby') throw new Error('Das Spiel läuft schon — Beitritt jetzt nicht mehr möglich.');
+        await pRef.update({ name: name, connected: true, score: 0, joinedAt: firebase.database.ServerValue.TIMESTAMP });
+      }
+      try{ localStorage.setItem(PLAYER_NAME_KEY, name); }catch(e){}
+      pvMsg('');
+      enterLobby(name);
+    }catch(e){
+      console.error(e);
+      pvMsg(friendlyError(e), true);
+    }finally{
+      pvJoinBtn.disabled = false;
+    }
+  }
+
+  async function pvLeave(){
+    const wasUid = pvUid;
+    if(pvDetach) pvDetach();
+    try{ if(db && wasUid) await db.ref('rooms/' + JOIN_CODE + '/players/' + wasUid).remove(); }catch(e){ console.warn(e); }
+    showJoinPanel('');
+  }
+
+  async function startPlayerView(){
+    pvView.style.display = 'block';
+    pvRoomCode.textContent = JOIN_CODE || '—';
+    try{ pvNameInput.value = localStorage.getItem(PLAYER_NAME_KEY) || ''; }catch(e){}
+    if(JOIN_CODE.length !== 4){ pvJoinBtn.disabled = true; pvMsg('Ungültiger Beitritts-Link.', true); return; }
+    pvJoinBtn.addEventListener('click', pvJoin);
+    pvLeaveBtn.addEventListener('click', pvLeave);
+    pvNameInput.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); pvJoin(); } });
+
+    // War dieses Gerät schon im Raum (z. B. Seite neu geladen), direkt wieder in die Lobby.
+    if(!initFb()){ pvMsg('Firebase konnte nicht geladen werden (Internetverbindung?).', true); return; }
+    try{
+      pvUid = await ensureAuth();
+      const s = await db.ref('rooms/' + JOIN_CODE + '/players/' + pvUid).once('value');
+      const meta = await db.ref('rooms/' + JOIN_CODE + '/meta').once('value');
+      const m = meta.val();
+      if(s.exists() && s.val().name && m && m.phase !== 'ended') enterLobby(s.val().name);
+    }catch(e){ console.warn(e); }
+  }
+
+  // =====================================================================
+  // GATE: Raumcode statt Zugangscode eingeben
+  // =====================================================================
+  const gateJoinInput = $('gateJoinInput'), gateJoinBtn = $('gateJoinBtn');
+  function gateJoin(){
+    const c = gateJoinInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+    if(c.length !== 4){ $('gateError').textContent = 'Der Raumcode hat 4 Zeichen.'; return; }
+    window.location.href = window.location.pathname + '?join=' + c;
+  }
+  gateJoinBtn.addEventListener('click', gateJoin);
+  gateJoinInput.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); gateJoin(); } });
+
+  if(isJoinLink) startPlayerView();
+  else resumeHostRoom();
+})();
+</script>
+
 </body>
 </html>
