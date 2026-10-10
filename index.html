@@ -807,7 +807,7 @@
 
   <div class="panel" id="pvGuessPanel" style="display:none;">
     <h2>Song <span id="pvRoundNo" style="color:var(--gold);"></span> <span style="color:var(--slate); font-size:0.7em;">von <span id="pvRoundTotal"></span></span></h2>
-    <p class="hint">Hör zu und tippe, was du erkennst. Dein Tipp wird automatisch gesendet.</p>
+    <p class="hint" id="pvGuessHint">Warte, bis der Host den Song startet …</p>
     <div class="field"><label>Songtitel</label><input type="text" id="pvGuessTitle" maxlength="80" autocomplete="off" autocorrect="off" placeholder="Titel…"></div>
     <div class="field"><label>Interpret</label><input type="text" id="pvGuessArtist" maxlength="80" autocomplete="off" autocorrect="off" placeholder="Interpret…"></div>
     <button class="btn-gold btn-block" id="pvGuessBtn">Abschicken</button>
@@ -855,7 +855,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-10.2';
+  const APP_VERSION = '2026-10-10.3';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -1752,6 +1752,16 @@
   let localPlayersBackup = null;
   let remoteRound = 0;
   let unsubGuesses = null;
+  let songStartSent = false;   // pro Runde nur einmal: Song wurde gestartet -> Startzeit für die Handys
+  let remoteRoundOpen = false; // Runde läuft (Tippphase), solange nicht aufgedeckt
+  // 12,3 s  /  1:05 min
+  function fmtDur(ms){
+    if(typeof ms !== 'number' || isNaN(ms) || ms < 0) return '—';
+    const sec = ms / 1000;
+    if(sec < 60) return sec.toFixed(1).replace('.', ',') + ' s';
+    const m = Math.floor(sec / 60), r = Math.floor(sec % 60);
+    return m + ':' + (r < 10 ? '0' : '') + r + ' min';
+  }
   const mpSyncMsg = document.getElementById('mpSyncMsg');
   function syncError(e){
     console.error(e);
@@ -1911,6 +1921,8 @@
       stealBox.style.display = 'none';
       togetherGuesses = [];
       togetherJudgedCount = 0;
+      songStartSent = false;
+      remoteRoundOpen = !!(remoteGame && MP());
       if(remoteGame && MP()){
         remoteRound = songNumber;
         togetherRevealBtn.disabled = true; // erst nach dem Sync der neuen Runde freigeben
@@ -1923,6 +1935,7 @@
       togetherRevealPanel.style.display = 'none';
       togetherNextRoundBtn.disabled = true;
     } else {
+      remoteRoundOpen = false;
       togetherGuessPanel.style.display = 'none';
       togetherRevealPanel.style.display = 'none';
       guessTitle.value = ''; guessArtist.value = '';
@@ -1953,6 +1966,16 @@
     turntableStage.classList.toggle('playing', isPlaying);
     brandDot.classList.toggle('is-playing', isPlaying);
     nowStatus.textContent = isPlaying ? 'Läuft…' : 'Pausiert';
+    if(isPlaying) onSongPlaying();
+  }
+
+  // Erster Start des Songs in dieser Runde: Startzeit (Serverzeit) an die Handys melden,
+  // damit die Zeit bis zum Tipp gemessen werden kann. Pause/Weiterspielen ändert nichts.
+  function onSongPlaying(){
+    if(remoteGame && remoteRoundOpen && !songStartSent && MP()){
+      songStartSent = true;
+      MP().onSongStart().catch(syncError);
+    }
   }
 
   const deezerAudio = document.getElementById('deezerAudio');
@@ -2103,8 +2126,10 @@
     togetherGuessList.innerHTML =
       '<div class="hint" style="margin-bottom:8px;">' + done + ' von ' + players.length + ' haben getippt</div>' +
       players.map(p => {
-        const sent = !!(map && map[p.uid]);
-        return '<div class="mp-player"><span class="dot' + (sent ? ' ok' : '') + '"></span><span class="nm">' + escapeHtml(p.name) + '</span><span style="font-family:var(--mono); font-size:11.5px; color:var(--slate);">' + (sent ? '✓ getippt' : 'tippt …') + '</span></div>';
+        const g = map && map[p.uid];
+        const started = MP() ? MP().getStartedAt() : null;
+        const label = g ? ('✓ getippt' + ((g.at && started) ? ' · ' + fmtDur(g.at - started) : '')) : 'tippt …';
+        return '<div class="mp-player"><span class="dot' + (g ? ' ok' : '') + '"></span><span class="nm">' + escapeHtml(p.name) + '</span><span style="font-family:var(--mono); font-size:11.5px; color:var(--slate);">' + label + '</span></div>';
       }).join('');
   }
 
@@ -2137,6 +2162,7 @@
     const t = tracks[currentTrackId];
     if(t && t.source === 'deezer'){ deezerAudio.pause(); } else if(controller){ controller.pause(); }
 
+    remoteRoundOpen = false;
     if(remoteGame && MP()){
       // Erst sperren + Lösung veröffentlichen, dann die (nun endgültigen) Tipps lesen.
       togetherRevealBtn.disabled = true;
@@ -2203,10 +2229,12 @@
       wrap.style.padding = '14px';
       wrap.style.marginBottom = '10px';
       const hasGuess = !!((guess.title || '').trim() || (guess.artist || '').trim());
+      const startedAt = (remoteGame && MP()) ? MP().getStartedAt() : null;
+      const timeTxt = (hasGuess && guess.at && startedAt) ? ' (nach ' + fmtDur(guess.at - startedAt) + ')' : '';
       wrap.innerHTML = `
         <label style="color:var(--gold); margin-bottom:6px; display:block;">${escapeHtml(p.name)}</label>
         <div style="font-family:var(--mono); font-size:12.5px; color:var(--slate); margin-bottom:10px;">${hasGuess
-          ? 'Tipp: ' + escapeHtml((guess.title || '—') + ' / ' + (guess.artist || '—'))
+          ? 'Tipp' + timeTxt + ': ' + escapeHtml((guess.title || '—') + ' / ' + (guess.artist || '—'))
           : 'Kein Tipp abgegeben'}</div>
         <div class="judge-grid">
           <button class="btn-ghost" data-score="2">Beides richtig (+2)</button>
@@ -2252,6 +2280,7 @@
 
   function showEndScreen(){
     releaseWakeLock();
+    remoteRoundOpen = false;
     if(unsubGuesses){ unsubGuesses(); unsubGuesses = null; }
     if(remoteGame && MP()) MP().onGameEnd().catch(syncError);
     gameScreen.style.display = 'none';
@@ -2273,6 +2302,7 @@
 
   // Nach einem Handy-Spiel: lokale Spielerliste zurück, Raum zurück in die Lobby.
   function leaveRemoteGame(){
+    remoteRoundOpen = false;
     if(unsubGuesses){ unsubGuesses(); unsubGuesses = null; }
     if(remoteGame){
       if(MP()) MP().onGameReset().catch(syncError);
@@ -2560,9 +2590,23 @@
   const roomRef = path => db.ref('rooms/' + hostCode + '/' + path);
   const snapToMap = snap => { const m = {}; snap.forEach(ch => { m[ch.key] = ch.val(); }); return m; };
 
+  // Startzeit des Songs (Serverzeit) der aktuellen Runde — wird vom Host mitgelesen, um Tipp-Zeiten zu berechnen.
+  let hostStartedAt = null, startedRef = null, startedCb = null, roundReady = Promise.resolve();
+  function watchStartedAt(){
+    if(startedRef && startedCb) startedRef.off('value', startedCb);
+    hostStartedAt = null;
+    startedRef = roomRef('round/startedAt');
+    startedCb = startedRef.on('value', s => { hostStartedAt = s.val(); });
+  }
+  function unwatchStartedAt(){
+    if(startedRef && startedCb) startedRef.off('value', startedCb);
+    startedRef = startedCb = null; hostStartedAt = null;
+  }
+
   window.PTMP = {
     active: () => !!hostCode,
     getRoomPlayers: () => hostPlayers.slice(),
+    getStartedAt: () => hostStartedAt,
 
     // Spiel startet: alles zurücksetzen, Phase auf "playing"
     onGameStart: async function(uids){
@@ -2574,9 +2618,19 @@
 
     // Neue Runde: alte Tipps/Ergebnisse weg, Handys zeigen das Tippfeld.
     // Titel/Interpret des Songs stehen NICHT in der Datenbank, bis aufgedeckt wird.
-    onRound: async function(n, total){
-      await Promise.all([roomRef('guesses').remove(), roomRef('results').remove()]);
-      await roomRef('round').set({ n: n, total: total, state: 'guessing' });
+    onRound: function(n, total){
+      watchStartedAt();
+      roundReady = (async () => {
+        await Promise.all([roomRef('guesses').remove(), roomRef('results').remove()]);
+        await roomRef('round').set({ n: n, total: total, state: 'guessing' });
+      })();
+      return roundReady;
+    },
+
+    // Song läuft zum ersten Mal: Serverzeit als Startzeit. Erst danach können die Handys ihren Tipp senden.
+    onSongStart: async function(){
+      await roundReady; // sicherstellen, dass die Runde fertig angelegt ist (sonst würde sie die Startzeit überschreiben)
+      await roomRef('round/startedAt').set(firebase.database.ServerValue.TIMESTAMP);
     },
 
     // Live-Stand, wer schon getippt hat (nur der Host darf alle Tipps lesen)
@@ -2599,10 +2653,11 @@
       await Promise.all([roomRef('players/' + uid + '/score').set(total), roomRef('results/' + uid).set({ pts: pts, round: round })]);
     },
 
-    onGameEnd: async function(){ await roomRef('meta/phase').set('finished'); },
+    onGameEnd: async function(){ unwatchStartedAt(); await roomRef('meta/phase').set('finished'); },
 
     // Neues Spiel / Abbruch: Raum zurück in die Lobby, Punkte auf 0
     onGameReset: async function(){
+      unwatchStartedAt();
       await Promise.all([roomRef('guesses').remove(), roomRef('results').remove(), roomRef('round').remove()]);
       await Promise.all(hostPlayers.map(p => roomRef('players/' + p.uid + '/score').set(0)));
       await roomRef('meta/phase').set('lobby');
@@ -2625,7 +2680,17 @@
 
   let pvUid = null, pvDetach = null;
   // Zustand der Handy-Ansicht (wird von den Firebase-Listenern gefüllt, pvRender() zeichnet daraus)
-  let pvMeta = null, pvRound = null, pvResult = null, pvPlayers = [], pvLastN, pvMyGuess = { title: '', artist: '' }, pvSendTimer = null;
+  let pvMeta = null, pvRound = null, pvResult = null, pvPlayers = [], pvLastN, pvGuessRec = null, pvSending = false, pvGuessErr = '';
+  const pvGuessHint = $('pvGuessHint');
+
+  // 12,3 s  /  1:05 min
+  function fmtDur(ms){
+    if(typeof ms !== 'number' || isNaN(ms) || ms < 0) return '—';
+    const sec = ms / 1000;
+    if(sec < 60) return sec.toFixed(1).replace('.', ',') + ' s';
+    const m = Math.floor(sec / 60), r = Math.floor(sec % 60);
+    return m + ':' + (r < 10 ? '0' : '') + r + ' min';
+  }
 
   function pvMsg(text, isErr){ pvJoinMsg.textContent = text || ''; pvJoinMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
 
@@ -2664,6 +2729,25 @@
       pvRoundNo.textContent = pvRound.n;
       pvRoundTotal.textContent = pvRound.total;
       pvMyScoreGuess.textContent = myScore;
+      const rec = (pvGuessRec && pvGuessRec.round === pvRound.n) ? pvGuessRec : null;
+      const started = !!pvRound.startedAt;
+      if(rec){
+        // Tipp ist abgegeben und endgültig
+        pvGuessTitle.value = rec.title || ''; pvGuessArtist.value = rec.artist || '';
+        pvGuessTitle.disabled = true; pvGuessArtist.disabled = true;
+        pvGuessBtn.disabled = true; pvGuessBtn.textContent = 'Gesendet ✓';
+        const d = (rec.at && pvRound.startedAt) ? fmtDur(rec.at - pvRound.startedAt) : null;
+        pvGuessHint.textContent = 'Dein Tipp ist abgegeben und kann nicht mehr geändert werden. Warte, bis der Host aufdeckt …';
+        guessMsg('Gesendet ✓' + (d ? ' — nach ' + d : ''));
+      }else{
+        pvGuessTitle.disabled = !started; pvGuessArtist.disabled = !started;
+        pvGuessBtn.disabled = !started || pvSending;
+        pvGuessBtn.textContent = 'Abschicken';
+        pvGuessHint.textContent = started
+          ? 'Der Song läuft! Tippe Titel und Interpret und schicke deinen Tipp ab — die Zeit läuft mit.'
+          : 'Warte, bis der Host den Song startet …';
+        if(pvGuessErr) guessMsg(pvGuessErr, true); else if(!pvSending) guessMsg('');
+      }
       pvShow(pvGuessPanel);
       return;
     }
@@ -2675,7 +2759,9 @@
       else { pvRevealCover.style.display = 'none'; pvRevealCoverPlaceholder.style.display = 'flex'; }
       if(rv.funFact){ pvRevealFun.textContent = '💡 ' + rv.funFact; pvRevealFun.style.display = 'block'; } else { pvRevealFun.style.display = 'none'; }
       const res = (pvResult && pvRound && pvResult.round === pvRound.n) ? pvResult : null;
-      pvMyResult.innerHTML = 'Dein Tipp: ' + esc(pvMyGuess.title || '—') + ' / ' + esc(pvMyGuess.artist || '—') + '<br>' +
+      const myRec = (pvGuessRec && pvGuessRec.round === pvRound.n) ? pvGuessRec : null;
+      const myTime = (myRec && myRec.at && pvRound.startedAt) ? ' (nach ' + fmtDur(myRec.at - pvRound.startedAt) + ')' : '';
+      pvMyResult.innerHTML = (myRec ? 'Dein Tipp' + myTime + ': ' + esc(myRec.title || '—') + ' / ' + esc(myRec.artist || '—') : 'Du hast keinen Tipp abgegeben') + '<br>' +
         (res ? '<span style="color:var(--gold); font-size:15px;">+' + res.pts + (res.pts === 1 ? ' Punkt' : ' Punkte') + '</span>' : 'Wird bewertet …');
       pvScoreList.innerHTML = scoreRows(pvPlayers);
       pvShow(pvRevealPanel);
@@ -2688,28 +2774,28 @@
     pvShow(pvLobbyPanel);
   }
 
-  // Tipp senden (leer = Tipp zurückziehen). Nur in der Tipp-Phase erlaubt — die Regeln sperren danach.
+  // Tipp senden — nur auf Knopfdruck, einmalig und endgültig. Die Serverzeit (at) wird von Firebase gesetzt,
+  // daraus ergibt sich die Zeit seit Songstart. Die Regeln lassen nur einen Tipp pro Runde zu.
   async function pvSendGuess(){
-    clearTimeout(pvSendTimer);
-    if(!db || !pvUid || !pvRound) return;
-    if(pvRound.state !== 'guessing'){ guessMsg('Zu spät — der Host hat schon aufgedeckt.', true); return; }
+    if(!db || !pvUid || !pvRound || pvSending) return;
+    if(pvRound.state !== 'guessing'){ pvGuessErr = 'Zu spät — der Host hat schon aufgedeckt.'; guessMsg(pvGuessErr, true); return; }
+    if(!pvRound.startedAt){ return; }
     const title = pvGuessTitle.value.trim().slice(0, 80);
     const artist = pvGuessArtist.value.trim().slice(0, 80);
-    const ref = db.ref('rooms/' + JOIN_CODE + '/guesses/' + pvUid);
+    if(!title && !artist){ pvGuessErr = 'Bitte erst etwas eintippen.'; guessMsg(pvGuessErr, true); return; }
+    pvGuessErr = '';
+    pvSending = true;
+    pvGuessBtn.disabled = true;
+    guessMsg('Sende …');
     try{
-      if(!title && !artist){ await ref.remove(); pvMyGuess = { title: '', artist: '' }; guessMsg(''); return; }
-      await ref.set({ round: pvRound.n, title: title, artist: artist });
-      pvMyGuess = { title: title, artist: artist };
-      guessMsg('Gesendet ✓');
+      await db.ref('rooms/' + JOIN_CODE + '/guesses/' + pvUid).set({ round: pvRound.n, title: title, artist: artist, at: firebase.database.ServerValue.TIMESTAMP });
     }catch(e){
       console.warn(e);
-      guessMsg(/PERMISSION_DENIED/i.test((e && e.message) || '') ? 'Zu spät — der Host hat schon aufgedeckt.' : friendlyError(e), true);
+      pvGuessErr = /PERMISSION_DENIED/i.test((e && e.message) || '') ? 'Zu spät — der Host hat schon aufgedeckt (oder dein Tipp ist schon gesendet).' : friendlyError(e);
+    }finally{
+      pvSending = false;
+      pvRender();
     }
-  }
-  function pvQueueSend(){
-    guessMsg('…');
-    clearTimeout(pvSendTimer);
-    pvSendTimer = setTimeout(pvSendGuess, 600);
   }
 
   function enterLobby(name){
@@ -2721,9 +2807,10 @@
     const metaRef = db.ref(base + '/meta');
     const roundRef = db.ref(base + '/round');
     const resultRef = db.ref(base + '/results/' + pvUid);
+    const guessRef = db.ref(base + '/guesses/' + pvUid);
     const infoRef = db.ref('.info/connected');
 
-    pvMeta = null; pvRound = null; pvResult = null; pvPlayers = []; pvLastN = undefined; pvMyGuess = { title: '', artist: '' };
+    pvMeta = null; pvRound = null; pvResult = null; pvPlayers = []; pvLastN = undefined; pvGuessRec = null; pvSending = false; pvGuessErr = '';
     pvMyName.textContent = name;
     pvJoinPanel.style.display = 'none';
     pvLobbyPanel.style.display = 'block';
@@ -2753,37 +2840,28 @@
       pvRender();
     });
 
-    // Neue Runde: Eingabe leeren (bzw. eigenen schon gesendeten Tipp nach einem Neuladen wieder einsetzen)
+    // Neue Runde: Eingabefelder leeren. (Ein schon gesendeter Tipp kommt über den Listener unten zurück.)
     const roundCb = roundRef.on('value', s => {
       pvRound = s.val();
       const n = pvRound ? pvRound.n : null;
       if(n !== pvLastN){
         pvLastN = n;
-        clearTimeout(pvSendTimer);
-        pvGuessTitle.value = ''; pvGuessArtist.value = ''; pvMyGuess = { title: '', artist: '' }; guessMsg('');
-        if(n !== null){
-          db.ref(base + '/guesses/' + pvUid).once('value').then(g => {
-            const v = g.val();
-            if(v && v.round === n && pvLastN === n){
-              pvGuessTitle.value = v.title || ''; pvGuessArtist.value = v.artist || '';
-              pvMyGuess = { title: v.title || '', artist: v.artist || '' };
-              guessMsg('Gesendet ✓');
-              pvRender();
-            }
-          }).catch(() => {});
-        }
+        pvGuessTitle.value = ''; pvGuessArtist.value = ''; pvGuessErr = ''; guessMsg('');
       }
       pvRender();
     });
 
+    // Eigener Tipp (nur der Besitzer darf ihn lesen) — auch nach einem Neuladen der Seite wieder da.
+    const guessCb = guessRef.on('value', s => { pvGuessRec = s.val(); pvRender(); });
+
     const resultCb = resultRef.on('value', s => { pvResult = s.val(); pvRender(); });
 
     pvDetach = function(){
-      clearTimeout(pvSendTimer);
       infoRef.off('value', infoCb);
       playersRef.off('value', playersCb);
       metaRef.off('value', metaCb);
       roundRef.off('value', roundCb);
+      guessRef.off('value', guessCb);
       resultRef.off('value', resultCb);
       connRef.onDisconnect().cancel().catch(() => {});
       pvDetach = null;
@@ -2842,8 +2920,6 @@
     if(JOIN_CODE.length !== 4){ pvJoinBtn.disabled = true; pvMsg('Ungültiger Beitritts-Link.', true); return; }
     pvJoinBtn.addEventListener('click', pvJoin);
     pvLeaveBtn.addEventListener('click', pvLeave);
-    pvGuessTitle.addEventListener('input', pvQueueSend);
-    pvGuessArtist.addEventListener('input', pvQueueSend);
     pvGuessBtn.addEventListener('click', pvSendGuess);
     pvNameInput.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); pvJoin(); } });
 
