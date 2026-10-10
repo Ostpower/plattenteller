@@ -855,7 +855,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-10.4';
+  const APP_VERSION = '2026-10-10.5';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -1769,6 +1769,7 @@
   // ---------- Handy-Spiel sichern / wiederherstellen ----------
   // Das laufende Handy-Spiel wird nach jedem Schritt im Browser gesichert. Lädt die Host-Seite neu
   // (Bildschirm gesperrt, Akku-Sparmodus, versehentlich geschlossen), geht es dort weiter, wo es war.
+  let saveError = '';
   function saveGame(){
     if(!remoteGame) return;
     const mp = MP();
@@ -1782,7 +1783,8 @@
         remoteRound: remoteRound, stage: gameStage, songStartSent: songStartSent,
         guesses: togetherGuesses, judged: judgedMap
       }));
-    }catch(e){ /* Speicher voll/gesperrt: Spiel läuft trotzdem, nur ohne Wiederherstellung */ }
+      saveError = '';
+    }catch(e){ saveError = (e && e.message) || String(e); /* Speicher voll/gesperrt: Spiel läuft trotzdem, nur ohne Wiederherstellung */ }
   }
   function clearSavedGame(){ try{ localStorage.removeItem(GAME_KEY); }catch(e){} }
 
@@ -1794,15 +1796,21 @@
     deckProgressFill.style.width = Math.round((songNumber / totalDeckSize) * 100) + '%';
   }
 
-  // Wird vom Raum-Code (Firebase-Block) nach einem Neuladen aufgerufen. true = Spiel wiederhergestellt.
+  // Wird vom Raum-Code (Firebase-Block) nach einem Neuladen aufgerufen.
+  // Rückgabe: true = Spiel wiederhergestellt, sonst ein Text mit dem Grund.
   async function resumeGame(code){
     let saved = null;
     try{ saved = JSON.parse(localStorage.getItem(GAME_KEY) || 'null'); }catch(e){}
     const mp = MP();
-    if(!saved || saved.v !== 1 || saved.room !== code || !mp || !Array.isArray(saved.tracks) || !Array.isArray(saved.deck) ||
-       !Array.isArray(saved.players) || !saved.players.length || !saved.tracks[saved.currentTrackId]){
+    let reason = '';
+    if(!saved) reason = 'kein gesicherter Spielstand gefunden — das Spiel wurde vermutlich mit einer älteren Version gestartet' + (saveError ? ' (Sichern schlug fehl: ' + saveError + ')' : '');
+    else if(saved.v !== 1) reason = 'gesicherter Spielstand hat ein unbekanntes Format';
+    else if(saved.room !== code) reason = 'gesicherter Spielstand gehört zu einem anderen Raum';
+    else if(!mp) reason = 'Raum ist nicht aktiv';
+    else if(!Array.isArray(saved.tracks) || !Array.isArray(saved.deck) || !Array.isArray(saved.players) || !saved.players.length || !saved.tracks[saved.currentTrackId]) reason = 'gesicherter Spielstand ist unvollständig';
+    if(reason){
       clearSavedGame();
-      return false;
+      return reason;
     }
     tracks = saved.tracks;
     deck = saved.deck;
@@ -2572,6 +2580,11 @@
 
   let hostCode = null, hostPlayersRef = null, hostPlayersCb = null, hostInfoRef = null, hostInfoCb = null;
   let hostPlayers = []; // aktuelle Spieler im Raum (für den Spielstart)
+  let hostBeat = null;
+  // Präsenz-Herzschlag: Beim Neuladen meldet die ALTE Verbindung dem Server oft erst später "ich bin weg" und würde
+  // den Host nachträglich auf offline setzen, obwohl die neue Seite längst läuft. Darum bekräftigt die laufende
+  // Seite regelmäßig "online" — ein verspäteter Abbruch der alten Verbindung wird so schnell korrigiert.
+  const HEARTBEAT_MS = window.PT_HEARTBEAT_MS || 15000;
 
   function hostMsg(text, isErr){ mpHostMsg.textContent = text || ''; mpHostMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
 
@@ -2589,6 +2602,7 @@
     if(hostPlayersRef && hostPlayersCb) hostPlayersRef.off('value', hostPlayersCb);
     if(hostInfoRef && hostInfoCb) hostInfoRef.off('value', hostInfoCb);
     hostPlayersRef = hostPlayersCb = hostInfoRef = hostInfoCb = null;
+    if(hostBeat){ clearInterval(hostBeat); hostBeat = null; }
     hostPlayers = [];
     if(window.PTGameHooks) window.PTGameHooks.recheckStart();
   }
@@ -2616,6 +2630,7 @@
     hostInfoCb = hostInfoRef.on('value', s => {
       if(s.val() === true){ hc.onDisconnect().set(false); hc.set(true); }
     });
+    hostBeat = setInterval(() => { if(hostCode) hc.set(true).catch(() => {}); }, HEARTBEAT_MS);
   }
 
   async function createRoom(){
@@ -2662,15 +2677,15 @@
           // Es lief ein Spiel: aus dem gesicherten Stand wiederherstellen. Klappt das nicht, Raum zurück in die Lobby,
           // damit die Handys nicht hängen.
           hostMsg('Spiel wird wiederhergestellt …');
-          let resumed = false;
-          try{ resumed = !!(window.PTGameHooks && window.PTGameHooks.resumeGame && await window.PTGameHooks.resumeGame(code)); }
-          catch(e){ console.warn('Spiel konnte nicht wiederhergestellt werden', e); }
-          if(resumed){
+          let result = 'Wiederherstellung nicht verfügbar';
+          try{ if(window.PTGameHooks && window.PTGameHooks.resumeGame) result = await window.PTGameHooks.resumeGame(code); }
+          catch(e){ console.warn('Spiel konnte nicht wiederhergestellt werden', e); result = 'Fehler: ' + ((e && e.message) || e); }
+          if(result === true){
             hostMsg('Spiel wiederhergestellt ✓ — Song ggf. neu starten (die Zeitmessung läuft weiter).');
           }else{
             await Promise.all([db.ref('rooms/' + code + '/round').remove(), db.ref('rooms/' + code + '/results').remove(), db.ref('rooms/' + code + '/guesses').remove()]);
             await db.ref('rooms/' + code + '/meta/phase').set('lobby');
-            hostMsg('Das laufende Spiel konnte nicht wiederhergestellt werden — der Raum ist zurück in der Lobby.', true);
+            hostMsg('Das laufende Spiel konnte nicht wiederhergestellt werden (' + result + ') — der Raum ist zurück in der Lobby.', true);
           }
         }
       }
@@ -2949,6 +2964,10 @@
     const infoCb = infoRef.on('value', s => {
       if(s.val() === true){ connRef.onDisconnect().set(false); connRef.set(true).catch(() => {}); }
     });
+    // Herzschlag (siehe Host): korrigiert ein verspätetes "offline" einer alten Verbindung nach dem Neuladen.
+    const beat = setInterval(() => {
+      if(pvPlayers.some(p => p.uid === pvUid)) connRef.set(true).catch(() => {});
+    }, HEARTBEAT_MS);
 
     let seenMe = false;
     const playersCb = playersRef.on('value', snap => {
@@ -2988,6 +3007,7 @@
     const resultCb = resultRef.on('value', s => { pvResult = s.val(); pvRender(); });
 
     pvDetach = function(){
+      clearInterval(beat);
       infoRef.off('value', infoCb);
       playersRef.off('value', playersCb);
       metaRef.off('value', metaCb);
