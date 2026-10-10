@@ -855,7 +855,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-10.3';
+  const APP_VERSION = '2026-10-10.4';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -1742,7 +1742,7 @@
       hint.style.display = 'none';
     }
   }
-  window.PTGameHooks = { recheckStart: checkStart };
+
 
   // ---------- MODE (Reihenfolge vs. Zusammen) ----------
   let gameMode = 'sequential'; // 'sequential' | 'together'
@@ -1752,6 +1752,9 @@
   let localPlayersBackup = null;
   let remoteRound = 0;
   let unsubGuesses = null;
+  let gameStage = 'guessing';  // 'guessing' | 'reveal' | 'end' — für die Wiederherstellung nach einem Neuladen
+  let judgedMap = {};          // uid -> gewählte Bewertung dieser Runde (für die Wiederherstellung)
+  const GAME_KEY = 'plattenteller_host_game';
   let songStartSent = false;   // pro Runde nur einmal: Song wurde gestartet -> Startzeit für die Handys
   let remoteRoundOpen = false; // Runde läuft (Tippphase), solange nicht aufgedeckt
   // 12,3 s  /  1:05 min
@@ -1762,6 +1765,89 @@
     const m = Math.floor(sec / 60), r = Math.floor(sec % 60);
     return m + ':' + (r < 10 ? '0' : '') + r + ' min';
   }
+
+  // ---------- Handy-Spiel sichern / wiederherstellen ----------
+  // Das laufende Handy-Spiel wird nach jedem Schritt im Browser gesichert. Lädt die Host-Seite neu
+  // (Bildschirm gesperrt, Akku-Sparmodus, versehentlich geschlossen), geht es dort weiter, wo es war.
+  function saveGame(){
+    if(!remoteGame) return;
+    const mp = MP();
+    if(!mp) return;
+    try{
+      localStorage.setItem(GAME_KEY, JSON.stringify({
+        v: 1, room: mp.getRoomCode(), chosenMode: chosenMode,
+        tracks: tracks, deck: deck, totalDeckSize: totalDeckSize, currentTrackId: currentTrackId,
+        players: players.map(p => ({ name: p.name, uid: p.uid, score: p.score })),
+        localPlayers: (localPlayersBackup || []).map(p => ({ name: p.name })),
+        remoteRound: remoteRound, stage: gameStage, songStartSent: songStartSent,
+        guesses: togetherGuesses, judged: judgedMap
+      }));
+    }catch(e){ /* Speicher voll/gesperrt: Spiel läuft trotzdem, nur ohne Wiederherstellung */ }
+  }
+  function clearSavedGame(){ try{ localStorage.removeItem(GAME_KEY); }catch(e){} }
+
+  function updateDeckProgress(){
+    const songNumber = totalDeckSize - deck.length;
+    deckCurrentEl.textContent = songNumber;
+    deckTotalEl.textContent = totalDeckSize;
+    deckRemainingLabel.textContent = deck.length === 0 ? 'letzter Song' : deck.length + ' danach übrig';
+    deckProgressFill.style.width = Math.round((songNumber / totalDeckSize) * 100) + '%';
+  }
+
+  // Wird vom Raum-Code (Firebase-Block) nach einem Neuladen aufgerufen. true = Spiel wiederhergestellt.
+  async function resumeGame(code){
+    let saved = null;
+    try{ saved = JSON.parse(localStorage.getItem(GAME_KEY) || 'null'); }catch(e){}
+    const mp = MP();
+    if(!saved || saved.v !== 1 || saved.room !== code || !mp || !Array.isArray(saved.tracks) || !Array.isArray(saved.deck) ||
+       !Array.isArray(saved.players) || !saved.players.length || !saved.tracks[saved.currentTrackId]){
+      clearSavedGame();
+      return false;
+    }
+    tracks = saved.tracks;
+    deck = saved.deck;
+    totalDeckSize = saved.totalDeckSize;
+    currentTrackId = saved.currentTrackId;
+    chosenMode = saved.chosenMode || 'sequential';
+    localPlayersBackup = (saved.localPlayers || []).map(p => ({ name: p.name, score: 0, streak: 0, stealAvailable: false, stealUsed: false }));
+    players = saved.players.map(p => ({ name: p.name, uid: p.uid, score: p.score || 0, streak: 0, stealAvailable: false, stealUsed: false }));
+    remoteGame = true;
+    gameMode = 'together';
+    remoteRound = saved.remoteRound || 0;
+    judgedMap = saved.judged || {};
+    togetherGuesses = saved.guesses || [];
+    mpSyncMsg.textContent = '';
+    renderTracks();
+    setupScreen.style.display = 'none';
+    endScreen.style.display = 'none';
+    gameScreen.style.display = 'block';
+    requestWakeLock();
+
+    if(saved.stage === 'end'){
+      showEndScreen();
+    }else if(saved.stage === 'reveal'){
+      // Lösung war schon aufgedeckt: Bewertungsseite samt schon vergebener Bewertungen wiederherstellen
+      gameStage = 'reveal';
+      remoteRoundOpen = false;
+      songStartSent = !!saved.songStartSent;
+      const t = tracks[currentTrackId];
+      updateDeckProgress();
+      guessPanel.style.display = 'none';
+      revealPanel.style.display = 'none';
+      stealBox.style.display = 'none';
+      mp.resumeRound();
+      showTogetherReveal(t);
+      renderTogetherJudgeList(t, judgedMap);
+    }else{
+      // Tippphase: Song neu laden (pausiert). Runde und Tipps bleiben in Firebase unverändert.
+      loadNextTrack(true);
+      songStartSent = !!saved.songStartSent;
+      remoteRoundOpen = true;
+    }
+    renderScoreboard();
+    return true;
+  }
+  window.PTGameHooks = { recheckStart: checkStart, resumeGame: resumeGame };
   const mpSyncMsg = document.getElementById('mpSyncMsg');
   function syncError(e){
     console.error(e);
@@ -1863,6 +1949,7 @@
       players = mp.getRoomPlayers().map(rp => ({ name: rp.name, uid: rp.uid, score: 0, streak: 0, stealAvailable: false, stealUsed: false }));
       gameMode = 'together';
       remoteRound = 0;
+      judgedMap = {};
       mp.onGameStart(players.map(p => p.uid)).catch(syncError);
     }
     deck = shuffle(tracks.map((_,i)=>i));
@@ -1895,17 +1982,17 @@
     });
   }
 
-  function loadNextTrack(){
-    if(deck.length === 0){ showEndScreen(); return; }
-    const trackIdx = deck.pop();
-    currentTrackId = trackIdx;
+  // resume=true: denselben Song nach einem Neuladen erneut anzeigen (nichts vom Stapel nehmen, Runde in Firebase nicht anfassen)
+  function loadNextTrack(resume){
+    if(!resume){
+      if(deck.length === 0){ showEndScreen(); return; }
+      currentTrackId = deck.pop();
+    }
+    const trackIdx = currentTrackId;
     const t = tracks[trackIdx];
 
     const songNumber = totalDeckSize - deck.length;
-    deckCurrentEl.textContent = songNumber;
-    deckTotalEl.textContent = totalDeckSize;
-    deckRemainingLabel.textContent = deck.length === 0 ? 'letzter Song' : deck.length + ' danach übrig';
-    deckProgressFill.style.width = Math.round((songNumber / totalDeckSize) * 100) + '%';
+    updateDeckProgress();
 
     labelTitle.textContent = ''; labelTitle.classList.remove('shown');
     labelArtist.textContent = ''; labelArtist.classList.remove('shown');
@@ -1923,7 +2010,11 @@
       togetherJudgedCount = 0;
       songStartSent = false;
       remoteRoundOpen = !!(remoteGame && MP());
-      if(remoteGame && MP()){
+      if(remoteGame && MP() && resume){
+        remoteRound = songNumber;
+        MP().resumeRound();
+        togetherRevealBtn.disabled = false;
+      }else if(remoteGame && MP()){
         remoteRound = songNumber;
         togetherRevealBtn.disabled = true; // erst nach dem Sync der neuen Runde freigeben
         MP().onRound(songNumber, totalDeckSize).then(() => { togetherRevealBtn.disabled = false; }).catch(e => { togetherRevealBtn.disabled = false; syncError(e); });
@@ -1934,6 +2025,9 @@
       togetherGuessPanel.style.display = 'block';
       togetherRevealPanel.style.display = 'none';
       togetherNextRoundBtn.disabled = true;
+      gameStage = 'guessing';
+      if(!resume){ judgedMap = {}; togetherGuesses = []; }
+      saveGame();
     } else {
       remoteRoundOpen = false;
       togetherGuessPanel.style.display = 'none';
@@ -1974,6 +2068,7 @@
   function onSongPlaying(){
     if(remoteGame && remoteRoundOpen && !songStartSent && MP()){
       songStartSent = true;
+      saveGame();
       MP().onSongStart().catch(syncError);
     }
   }
@@ -2183,6 +2278,15 @@
       });
     }
 
+    gameStage = 'reveal';
+    judgedMap = {};
+    saveGame();
+    showTogetherReveal(t);
+    renderTogetherJudgeList(t);
+  };
+
+  // Auflösung anzeigen (Cover, Titel, Fun Fact, Etikett auf der Kassette)
+  function showTogetherReveal(t){
     togetherGuessPanel.style.display = 'none';
     togetherRevealPanel.style.display = 'block';
 
@@ -2208,11 +2312,9 @@
       labelTitle.classList.add('shown');
       setTimeout(() => labelArtist.classList.add('shown'), 180);
     });
+  }
 
-    renderTogetherJudgeList(t);
-  };
-
-  function renderTogetherJudgeList(t){
+  function renderTogetherJudgeList(t, restore){
     togetherJudgedCount = 0;
     togetherNextRoundBtn.disabled = true;
     togetherJudgeList.innerHTML = '';
@@ -2253,6 +2355,13 @@
       });
 
       let rowJudged = false;
+      // Nach einem Neuladen: schon vergebene Bewertungen wieder als erledigt anzeigen (Punkte sind bereits verbucht).
+      const prev = (restore && p.uid) ? restore[p.uid] : undefined;
+      if(prev !== undefined){
+        rowJudged = true;
+        rowButtons.forEach(b => { b.disabled = true; if(b.getAttribute('data-score') === prev) b.classList.add('judged'); });
+        togetherJudgedCount++;
+      }
       rowButtons.forEach(btn => {
         btn.addEventListener('click', () => {
           if(rowJudged) return;
@@ -2263,7 +2372,11 @@
           let pts = 0;
           if(val === '2') pts = 2; else if(val === '1a' || val === '1b') pts = 1;
           p.score += pts;
-          if(remoteGame && MP() && p.uid) MP().onJudged(p.uid, pts, p.score, remoteRound).catch(syncError);
+          if(remoteGame && MP() && p.uid){
+            MP().onJudged(p.uid, pts, p.score, remoteRound).catch(syncError);
+            judgedMap[p.uid] = val;
+            saveGame();
+          }
           renderScoreboard();
           togetherJudgedCount++;
           togetherNextRoundBtn.disabled = togetherJudgedCount < players.length;
@@ -2271,6 +2384,7 @@
       });
       togetherJudgeList.appendChild(wrap);
     });
+    togetherNextRoundBtn.disabled = togetherJudgedCount < players.length;
   }
 
   togetherNextRoundBtn.onclick = () => {
@@ -2281,6 +2395,8 @@
   function showEndScreen(){
     releaseWakeLock();
     remoteRoundOpen = false;
+    gameStage = 'end';
+    saveGame();
     if(unsubGuesses){ unsubGuesses(); unsubGuesses = null; }
     if(remoteGame && MP()) MP().onGameEnd().catch(syncError);
     gameScreen.style.display = 'none';
@@ -2303,6 +2419,7 @@
   // Nach einem Handy-Spiel: lokale Spielerliste zurück, Raum zurück in die Lobby.
   function leaveRemoteGame(){
     remoteRoundOpen = false;
+    clearSavedGame();
     if(unsubGuesses){ unsubGuesses(); unsubGuesses = null; }
     if(remoteGame){
       if(MP()) MP().onGameReset().catch(syncError);
@@ -2540,12 +2657,22 @@
       const s = await db.ref('rooms/' + code + '/meta').once('value');
       const m = s.val();
       if(m && m.hostUid === myUid && m.phase !== 'ended'){
-        if(m.phase !== 'lobby'){
-          // Das laufende Spiel lebte nur im Speicher dieser Seite — Raum zurück in die Lobby, damit die Handys nicht hängen.
-          await Promise.all([db.ref('rooms/' + code + '/round').remove(), db.ref('rooms/' + code + '/results').remove(), db.ref('rooms/' + code + '/guesses').remove()]);
-          await db.ref('rooms/' + code + '/meta/phase').set('lobby');
-        }
         attachHostRoom(code);
+        if(m.phase !== 'lobby'){
+          // Es lief ein Spiel: aus dem gesicherten Stand wiederherstellen. Klappt das nicht, Raum zurück in die Lobby,
+          // damit die Handys nicht hängen.
+          hostMsg('Spiel wird wiederhergestellt …');
+          let resumed = false;
+          try{ resumed = !!(window.PTGameHooks && window.PTGameHooks.resumeGame && await window.PTGameHooks.resumeGame(code)); }
+          catch(e){ console.warn('Spiel konnte nicht wiederhergestellt werden', e); }
+          if(resumed){
+            hostMsg('Spiel wiederhergestellt ✓ — Song ggf. neu starten (die Zeitmessung läuft weiter).');
+          }else{
+            await Promise.all([db.ref('rooms/' + code + '/round').remove(), db.ref('rooms/' + code + '/results').remove(), db.ref('rooms/' + code + '/guesses').remove()]);
+            await db.ref('rooms/' + code + '/meta/phase').set('lobby');
+            hostMsg('Das laufende Spiel konnte nicht wiederhergestellt werden — der Raum ist zurück in der Lobby.', true);
+          }
+        }
       }
       else { try{ localStorage.removeItem(HOST_ROOM_KEY); }catch(e){} }
     }catch(e){ console.warn('Raum konnte nicht wiederhergestellt werden', e); }
@@ -2559,7 +2686,7 @@
     catch(e){ console.warn(e); }
     detachHost();
     hostCode = null;
-    try{ localStorage.removeItem(HOST_ROOM_KEY); }catch(e){}
+    try{ localStorage.removeItem(HOST_ROOM_KEY); localStorage.removeItem('plattenteller_host_game'); }catch(e){}
     mpRoomBox.style.display = 'none';
     mpCreateBtn.style.display = '';
     hostMsg('Raum ' + code + ' geschlossen.');
@@ -2605,8 +2732,12 @@
 
   window.PTMP = {
     active: () => !!hostCode,
+    getRoomCode: () => hostCode,
     getRoomPlayers: () => hostPlayers.slice(),
     getStartedAt: () => hostStartedAt,
+
+    // Nach einem Neuladen des Hosts: laufende Runde in Firebase NICHT anfassen, nur die Startzeit wieder mitlesen.
+    resumeRound: function(){ watchStartedAt(); roundReady = Promise.resolve(); },
 
     // Spiel startet: alles zurücksetzen, Phase auf "playing"
     onGameStart: async function(uids){
