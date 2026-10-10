@@ -788,6 +788,7 @@
   <h1 class="title">Plattenteller</h1>
   <p class="subtitle">Du spielst mit deinem eigenen Handy mit.</p>
   <div class="version-tag" style="text-align:center; font-family:var(--mono); font-size:10px; color:var(--slate); opacity:0.5; margin-top:-6px; margin-bottom:14px;"></div>
+  <div id="pvOfflineBar" style="display:none; position:sticky; top:8px; z-index:5; background:var(--coral); color:#fff; font-size:13px; line-height:1.4; padding:10px 14px; border-radius:10px; margin-bottom:12px;">Keine Verbindung — ein abgeschickter Tipp wird gesendet, sobald du wieder online bist (und zählt erst ab dann; nach dem Aufdecken ist es zu spät).</div>
 
   <div class="panel" id="pvJoinPanel">
     <h2>Raum <span id="pvRoomCode" style="color:var(--gold);"></span></h2>
@@ -813,6 +814,7 @@
     <button class="btn-gold btn-block" id="pvGuessBtn">Abschicken</button>
     <div class="mp-msg" id="pvGuessMsg"></div>
     <div style="font-family:var(--mono); font-size:12px; color:var(--slate); margin-top:10px;">Dein Punktestand: <span id="pvMyScoreGuess" style="color:var(--gold);">0</span></div>
+    <button class="btn-ghost btn-block pv-leave" style="margin-top:14px; font-size:12.5px;">Spiel verlassen</button>
   </div>
 
   <div class="panel" id="pvRevealPanel" style="display:none;">
@@ -829,12 +831,14 @@
     <label>Punktestand</label>
     <div id="pvScoreList"></div>
     <p class="hint" style="margin:10px 0 0;">Warte auf den nächsten Song…</p>
+    <button class="btn-ghost btn-block pv-leave" style="margin-top:10px; font-size:12.5px;">Spiel verlassen</button>
   </div>
 
   <div class="panel" id="pvFinalPanel" style="display:none;">
     <h2>Spiel vorbei!</h2>
     <div id="pvFinalList"></div>
     <p class="hint" style="margin:10px 0 0;">Der Host kann eine neue Runde starten — du bleibst im Raum.</p>
+    <button class="btn-ghost btn-block pv-leave" style="margin-top:10px; font-size:12.5px;">Raum verlassen</button>
   </div>
 </div>
 
@@ -855,7 +859,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-10.6';
+  const APP_VERSION = '2026-10-10.7';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -1752,6 +1756,10 @@
   let localPlayersBackup = null;
   let remoteRound = 0;
   let unsubGuesses = null;
+  let lastGuessMap = {};       // zuletzt gesehene Tipps (uid -> Tipp) für die Statusliste
+  let judgeUids = null;        // wer in DIESER Runde bewertet wird (Stand beim Aufdecken)
+  let judgeTotal = 0;          // Anzahl der Bewertungszeilen dieser Runde
+  let judgeRowApi = {};        // uid -> Funktion, die die Zeile bewertet (für Automatik/Wiederherstellung)
   let gameStage = 'guessing';  // 'guessing' | 'reveal' | 'end' — für die Wiederherstellung nach einem Neuladen
   let judgedMap = {};          // uid -> gewählte Bewertung dieser Runde (für die Wiederherstellung)
   const GAME_KEY = 'plattenteller_host_game';
@@ -1781,7 +1789,7 @@
         players: players.map(p => ({ name: p.name, uid: p.uid, score: p.score })),
         localPlayers: (localPlayersBackup || []).map(p => ({ name: p.name })),
         remoteRound: remoteRound, stage: gameStage, songStartSent: songStartSent,
-        guesses: togetherGuesses, judged: judgedMap
+        guesses: togetherGuesses, judged: judgedMap, judgeUids: judgeUids
       }));
       saveError = '';
     }catch(e){ saveError = (e && e.message) || String(e); /* Speicher voll/gesperrt: Spiel läuft trotzdem, nur ohne Wiederherstellung */ }
@@ -1794,6 +1802,43 @@
     deckTotalEl.textContent = totalDeckSize;
     deckRemainingLabel.textContent = deck.length === 0 ? 'letzter Song' : deck.length + ' danach übrig';
     deckProgressFill.style.width = Math.round((songNumber / totalDeckSize) * 100) + '%';
+  }
+
+  // Abgleich der Spieler im Spiel mit dem Raum (läuft bei jeder Änderung in Firebase):
+  // ausgestiegen / offline / vom Host entfernt / Späteinsteiger.
+  function syncRoomPlayers(list){
+    if(!remoteGame || !MP() || gameStage === 'end') return;
+    const byUid = {};
+    list.forEach(r => { byUid[r.uid] = r; });
+    let changed = false;
+    players.forEach(p => {
+      if(!p.uid) return;
+      const r = byUid[p.uid];
+      if(!r){
+        if(!p.removed){ p.removed = true; changed = true; onPlayerGone(p); }
+        return;
+      }
+      if(p.removed){ p.removed = false; p.score = r.score || 0; changed = true; } // kam (neu) wieder in den Raum
+      if(!!p.left !== !!r.left || p.connected !== r.connected){ p.left = !!r.left; p.connected = r.connected; changed = true; }
+    });
+    list.forEach(r => {
+      if(players.some(p => p.uid === r.uid)) return;
+      // Späteinsteiger: ab jetzt dabei (in einer schon aufgedeckten Runde zählt er erst ab der nächsten)
+      const np = { name: r.name, uid: r.uid, score: r.score || 0, streak: 0, stealAvailable: false, stealUsed: false, left: !!r.left, connected: r.connected };
+      players.push(np);
+      changed = true;
+      if(gameStage === 'reveal') MP().onJudged(r.uid, 0, np.score, remoteRound).catch(syncError);
+    });
+    if(changed){
+      renderScoreboard();
+      if(gameStage === 'guessing' && togetherGuessPanel.style.display === 'block') renderRemoteGuessStatus(lastGuessMap);
+      saveGame();
+    }
+  }
+  // Spieler ist weg (entfernt): seine noch offene Bewertung dieser Runde zählt automatisch 0.
+  function onPlayerGone(p){
+    const api = judgeRowApi[p.uid];
+    if(gameStage === 'reveal' && api && judgedMap[p.uid] === undefined) api('0');
   }
 
   // Wird vom Raum-Code (Firebase-Block) nach einem Neuladen aufgerufen.
@@ -1823,6 +1868,7 @@
     gameMode = 'together';
     remoteRound = saved.remoteRound || 0;
     judgedMap = saved.judged || {};
+    judgeUids = Array.isArray(saved.judgeUids) ? saved.judgeUids : null;
     togetherGuesses = saved.guesses || [];
     mpSyncMsg.textContent = '';
     renderTracks();
@@ -1852,10 +1898,14 @@
       songStartSent = !!saved.songStartSent;
       remoteRoundOpen = true;
     }
+    // Spieler mit dem Raum abgleichen (ausgestiegen/entfernt/offline). Ist die Liste noch nicht da,
+    // passiert das automatisch, sobald sie ankommt.
+    const all = mp.getAllRoomPlayers();
+    if(all) syncRoomPlayers(all);
     renderScoreboard();
     return true;
   }
-  window.PTGameHooks = { recheckStart: checkStart, resumeGame: resumeGame };
+  window.PTGameHooks = { recheckStart: checkStart, resumeGame: resumeGame, onRoomPlayers: syncRoomPlayers };
   const mpSyncMsg = document.getElementById('mpSyncMsg');
   function syncError(e){
     console.error(e);
@@ -1973,13 +2023,16 @@
 
   function renderScoreboard(){
     scoreboard.innerHTML = '';
-    const maxScore = Math.max(0, ...players.map(p => p.score));
-    players.forEach((p,i) => {
+    const visible = players.filter(p => !p.removed);
+    const maxScore = Math.max(0, ...visible.map(p => p.score));
+    visible.forEach((p,i) => {
       const isLeader = p.score > 0 && p.score === maxScore;
       const isActive = gameMode === 'sequential' && i === currentPlayerIdx;
       const chip = document.createElement('div');
       chip.className = 'score-chip' + (isActive ? ' active' : '');
-      const streakTag = (p.streak && p.streak >= 2) ? ` <span title="Streak">🔥${p.streak}</span>` : '';
+      const statusTxt = p.left ? 'ausgestiegen' : ((remoteGame && p.connected === false) ? 'offline' : '');
+      if(statusTxt) chip.style.opacity = '0.6';
+      const streakTag = (p.streak && p.streak >= 2) ? ` <span title="Streak">🔥${p.streak}</span>` : (statusTxt ? '<span style="color:var(--slate);">' + statusTxt + '</span>' : '');
       chip.innerHTML = `
         <div class="turn-badge" style="${isActive ? '' : 'visibility:hidden;'}">Am Zug</div>
         <div class="name">${escapeHtml(p.name)}${isLeader ? ' <span class="crown">👑</span>' : ''}</div>
@@ -2034,7 +2087,7 @@
       togetherRevealPanel.style.display = 'none';
       togetherNextRoundBtn.disabled = true;
       gameStage = 'guessing';
-      if(!resume){ judgedMap = {}; togetherGuesses = []; }
+      if(!resume){ judgedMap = {}; judgeUids = null; lastGuessMap = {}; togetherGuesses = []; }
       saveGame();
     } else {
       remoteRoundOpen = false;
@@ -2225,16 +2278,41 @@
 
   // ---------- ZUSAMMEN-MODUS: alle raten parallel, jede*r wird einzeln bewertet ----------
   function renderRemoteGuessStatus(map){
-    const done = players.filter(p => map && map[p.uid]).length;
+    lastGuessMap = map || {};
+    const shown = players.filter(p => !p.removed);
+    const active = shown.filter(p => !p.left);
+    const done = active.filter(p => lastGuessMap[p.uid]).length;
+    const started = MP() ? MP().getStartedAt() : null;
     togetherGuessList.innerHTML =
-      '<div class="hint" style="margin-bottom:8px;">' + done + ' von ' + players.length + ' haben getippt</div>' +
-      players.map(p => {
-        const g = map && map[p.uid];
-        const started = MP() ? MP().getStartedAt() : null;
-        const label = g ? ('✓ getippt' + ((g.at && started) ? ' · ' + fmtDur(g.at - started) : '')) : 'tippt …';
-        return '<div class="mp-player"><span class="dot' + (g ? ' ok' : '') + '"></span><span class="nm">' + escapeHtml(p.name) + '</span><span style="font-family:var(--mono); font-size:11.5px; color:var(--slate);">' + label + '</span></div>';
+      '<div class="hint" style="margin-bottom:8px;">' + done + ' von ' + active.length + ' haben getippt</div>' +
+      shown.map(p => {
+        const g = lastGuessMap[p.uid];
+        const online = !p.left && p.connected !== false;
+        let label;
+        if(p.left) label = 'ausgestiegen';
+        else if(g) label = '✓ getippt' + ((g.at && started) ? ' · ' + fmtDur(g.at - started) : '');
+        else if(p.connected === false) label = 'offline';
+        else label = 'tippt …';
+        return '<div class="mp-player"><span class="dot' + (online ? ' ok' : '') + '"></span><span class="nm">' + escapeHtml(p.name) + '</span>' +
+          '<span style="font-family:var(--mono); font-size:11.5px; color:var(--slate);">' + label + '</span>' +
+          '<button class="mp-kick" data-uid="' + escapeHtml(p.uid || '') + '" title="Aus dem Spiel entfernen">×</button></div>';
       }).join('');
   }
+  // Spieler im laufenden Spiel entfernen (z. B. wenn jemand dauerhaft offline ist)
+  togetherGuessList.addEventListener('click', e => {
+    const btn = e.target.closest('.mp-kick');
+    if(!btn || !remoteGame || !MP()) return;
+    const uid = btn.getAttribute('data-uid');
+    const p = players.find(x => x.uid === uid);
+    if(!p) return;
+    if(!window.confirm('„' + p.name + '“ aus dem Spiel entfernen?')) return;
+    p.removed = true;
+    onPlayerGone(p);
+    renderScoreboard();
+    renderRemoteGuessStatus(lastGuessMap);
+    saveGame();
+    MP().removePlayer(uid).catch(syncError);
+  });
 
   function renderTogetherGuessPanel(){
     const hintEl = document.getElementById('togetherGuessHint');
@@ -2288,6 +2366,7 @@
 
     gameStage = 'reveal';
     judgedMap = {};
+    judgeUids = null; // wird in renderTogetherJudgeList aus den aktuell aktiven Spielern gebildet
     saveGame();
     showTogetherReveal(t);
     renderTogetherJudgeList(t);
@@ -2326,10 +2405,22 @@
     togetherJudgedCount = 0;
     togetherNextRoundBtn.disabled = true;
     togetherJudgeList.innerHTML = '';
+    judgeRowApi = {};
     const realTitle = normalize(t.title);
     const realArtist = normalize(t.artist);
 
-    players.forEach((p, i) => {
+    // Wer wird in dieser Runde bewertet? Handy-Spiel: alle, die beim Aufdecken weder ausgestiegen noch entfernt waren.
+    let rows;
+    if(remoteGame){
+      if(!Array.isArray(judgeUids)) judgeUids = players.filter(p => !p.removed && !p.left).map(p => p.uid);
+      rows = judgeUids.map(uid => players.find(p => p.uid === uid)).filter(Boolean);
+    }else{
+      rows = players.slice();
+    }
+    judgeTotal = rows.length;
+
+    rows.forEach(p => {
+      const i = players.indexOf(p);
       const guess = togetherGuesses[i] || { title: '', artist: '' };
       const guessedTitle = normalize(guess.title);
       const guessedArtist = normalize(guess.artist);
@@ -2345,7 +2436,7 @@
         <label style="color:var(--gold); margin-bottom:6px; display:block;">${escapeHtml(p.name)}</label>
         <div style="font-family:var(--mono); font-size:12.5px; color:var(--slate); margin-bottom:10px;">${hasGuess
           ? 'Tipp' + timeTxt + ': ' + escapeHtml((guess.title || '—') + ' / ' + (guess.artist || '—'))
-          : 'Kein Tipp abgegeben'}</div>
+          : 'Kein Tipp abgegeben' + (remoteGame ? ' → automatisch 0 Punkte' : '')}</div>
         <div class="judge-grid">
           <button class="btn-ghost" data-score="2">Beides richtig (+2)</button>
           <button class="btn-ghost" data-score="1a">Nur Titel (+1)</button>
@@ -2363,40 +2454,40 @@
       });
 
       let rowJudged = false;
-      // Nach einem Neuladen: schon vergebene Bewertungen wieder als erledigt anzeigen (Punkte sind bereits verbucht).
-      const prev = (restore && p.uid) ? restore[p.uid] : undefined;
-      if(prev !== undefined){
+      // Bewertung anwenden: per Klick, automatisch (kein Tipp / Spieler entfernt) oder beim Wiederherstellen (dann keine neuen Punkte).
+      const applyJudge = (val, opts) => {
+        if(rowJudged) return;
         rowJudged = true;
-        rowButtons.forEach(b => { b.disabled = true; if(b.getAttribute('data-score') === prev) b.classList.add('judged'); });
-        togetherJudgedCount++;
-      }
-      rowButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-          if(rowJudged) return;
-          rowJudged = true;
-          rowButtons.forEach(b => { b.disabled = true; });
-          btn.classList.add('judged');
-          const val = btn.getAttribute('data-score');
+        rowButtons.forEach(b => { b.disabled = true; if(b.getAttribute('data-score') === val) b.classList.add('judged'); });
+        const restoring = !!(opts && opts.restore);
+        if(!restoring){
           let pts = 0;
           if(val === '2') pts = 2; else if(val === '1a' || val === '1b') pts = 1;
           p.score += pts;
           if(remoteGame && MP() && p.uid){
             MP().onJudged(p.uid, pts, p.score, remoteRound).catch(syncError);
             judgedMap[p.uid] = val;
-            saveGame();
           }
           renderScoreboard();
-          togetherJudgedCount++;
-          togetherNextRoundBtn.disabled = togetherJudgedCount < players.length;
-        });
-      });
+        }
+        togetherJudgedCount++;
+        togetherNextRoundBtn.disabled = togetherJudgedCount < judgeTotal;
+        if(!restoring) saveGame();
+      };
+      if(p.uid) judgeRowApi[p.uid] = applyJudge;
+      rowButtons.forEach(btn => btn.addEventListener('click', () => applyJudge(btn.getAttribute('data-score'))));
       togetherJudgeList.appendChild(wrap);
+
+      const prev = (restore && p.uid) ? restore[p.uid] : undefined;
+      if(prev !== undefined) applyJudge(prev, { restore: true });
+      else if(remoteGame && !hasGuess) applyJudge('0'); // kein Tipp (z. B. offline) -> automatisch 0 Punkte
     });
-    togetherNextRoundBtn.disabled = togetherJudgedCount < players.length;
+    togetherNextRoundBtn.disabled = togetherJudgedCount < judgeTotal;
+    saveGame();
   }
 
   togetherNextRoundBtn.onclick = () => {
-    if(togetherJudgedCount < players.length) return;
+    if(togetherJudgedCount < judgeTotal) return;
     loadNextTrack();
   };
 
@@ -2410,14 +2501,14 @@
     gameScreen.style.display = 'none';
     endScreen.style.display = 'block';
     const finalList = document.getElementById('finalList');
-    const sorted = players.slice().sort((a,b)=>b.score-a.score);
+    const sorted = players.filter(p => !p.removed).sort((a,b)=>b.score-a.score);
     finalList.innerHTML = '';
     sorted.forEach((p,i) => {
       const row = document.createElement('div');
       row.className = 'final-row' + (i===0 ? ' winner' : '');
       row.innerHTML = `
         <div class="rank">${i+1}</div>
-        <div class="fname">${escapeHtml(p.name)}${i===0 ? ' 👑' : ''}</div>
+        <div class="fname">${escapeHtml(p.name)}${i===0 ? ' 👑' : ''}${p.left ? ' <span style="color:var(--slate); font-size:0.75em;">(ausgestiegen)</span>' : ''}</div>
         <div class="fpts">${p.score} Pkt.</div>
       `;
       finalList.appendChild(row);
@@ -2564,7 +2655,7 @@
     const out = [];
     snap.forEach(ch => {
       const v = ch.val() || {};
-      if(v.name) out.push({ uid: ch.key, name: v.name, connected: !!v.connected, joinedAt: v.joinedAt || 0, score: v.score || 0 });
+      if(v.name) out.push({ uid: ch.key, name: v.name, connected: !!v.connected, left: !!v.left, joinedAt: v.joinedAt || 0, score: v.score || 0 });
     });
     out.sort((a, b) => a.joinedAt - b.joinedAt);
     return out;
@@ -2583,6 +2674,7 @@
 
   let hostCode = null, hostPlayersRef = null, hostPlayersCb = null, hostInfoRef = null, hostInfoCb = null;
   let hostPlayers = []; // aktuelle Spieler im Raum (für den Spielstart)
+  let hostPlayersLoaded = false; // true, sobald die Spielerliste das erste Mal von Firebase angekommen ist
   let hostBeat = null;
   // Präsenz-Herzschlag: Beim Neuladen meldet die ALTE Verbindung dem Server oft erst später "ich bin weg" und würde
   // den Host nachträglich auf offline setzen, obwohl die neue Seite längst läuft. Darum bekräftigt die laufende
@@ -2607,6 +2699,7 @@
     hostPlayersRef = hostPlayersCb = hostInfoRef = hostInfoCb = null;
     if(hostBeat){ clearInterval(hostBeat); hostBeat = null; }
     hostPlayers = [];
+    hostPlayersLoaded = false;
     if(window.PTGameHooks) window.PTGameHooks.recheckStart();
   }
 
@@ -2620,10 +2713,11 @@
     hostPlayersCb = hostPlayersRef.on('value', snap => {
       const list = playersFromSnap(snap);
       hostPlayers = list;
-      if(window.PTGameHooks) window.PTGameHooks.recheckStart();
+      hostPlayersLoaded = true;
+      if(window.PTGameHooks){ window.PTGameHooks.recheckStart(); window.PTGameHooks.onRoomPlayers(list); }
       mpCount.textContent = list.length;
       mpPlayerList.innerHTML = list.length
-        ? list.map(p => '<div class="mp-player">' + dot(p.connected) + '<span class="nm">' + esc(p.name) + '</span><button class="mp-kick" data-uid="' + esc(p.uid) + '" title="Entfernen">×</button></div>').join('')
+        ? list.map(p => '<div class="mp-player">' + dot(p.connected && !p.left) + '<span class="nm">' + esc(p.name) + (p.left ? ' <span style="color:var(--slate); font-size:0.85em;">(ausgestiegen)</span>' : '') + '</span><button class="mp-kick" data-uid="' + esc(p.uid) + '" title="Entfernen">×</button></div>').join('')
         : '<p class="hint" style="margin:6px 0 0;">Noch niemand da — Code oder QR zeigen.</p>';
     });
 
@@ -2807,7 +2901,12 @@
   window.PTMP = {
     active: () => !!hostCode,
     getRoomCode: () => hostCode,
-    getRoomPlayers: () => hostPlayers.slice(),
+    // Spielbereite Spieler (wer ausgestiegen ist, zählt nicht)
+    getRoomPlayers: () => hostPlayers.filter(p => !p.left),
+    // Komplette Liste inkl. Ausgestiegener — oder null, solange sie noch nicht von Firebase da ist
+    getAllRoomPlayers: () => hostPlayersLoaded ? hostPlayers.slice() : null,
+    // Spieler aus dem Raum entfernen (auch im laufenden Spiel)
+    removePlayer: async function(uid){ await roomRef('players/' + uid).remove(); },
     getStartedAt: () => hostStartedAt,
 
     // Nach einem Neuladen des Hosts: laufende Runde in Firebase NICHT anfassen, nur die Startzeit wieder mitlesen.
@@ -2864,7 +2963,8 @@
     onGameReset: async function(){
       unwatchStartedAt();
       await Promise.all([roomRef('guesses').remove(), roomRef('results').remove(), roomRef('round').remove()]);
-      await Promise.all(hostPlayers.map(p => roomRef('players/' + p.uid + '/score').set(0)));
+      // Ausgestiegene sind für das nächste Spiel nicht mehr im Raum; alle anderen starten wieder bei 0.
+      await Promise.all(hostPlayers.map(p => p.left ? roomRef('players/' + p.uid).remove() : roomRef('players/' + p.uid + '/score').set(0)));
       await roomRef('meta/phase').set('lobby');
     }
   };
@@ -2882,6 +2982,7 @@
   const pvRevealCover = $('pvRevealCover'), pvRevealCoverPlaceholder = $('pvRevealCoverPlaceholder');
   const pvRevealTitle = $('pvRevealTitle'), pvRevealArtist = $('pvRevealArtist'), pvRevealFun = $('pvRevealFun');
   const pvMyResult = $('pvMyResult'), pvScoreList = $('pvScoreList'), pvFinalList = $('pvFinalList');
+  const pvOfflineBar = $('pvOfflineBar');
 
   let pvUid = null, pvDetach = null;
   // Zustand der Handy-Ansicht (wird von den Firebase-Listenern gefüllt, pvRender() zeichnet daraus)
@@ -2902,6 +3003,7 @@
   function showJoinPanel(message, isErr){
     [pvLobbyPanel, pvGuessPanel, pvRevealPanel, pvFinalPanel].forEach(p => { p.style.display = 'none'; });
     pvJoinPanel.style.display = 'block';
+    pvOfflineBar.style.display = 'none';
     pvMsg(message, isErr);
   }
 
@@ -2914,7 +3016,7 @@
   function scoreRows(list){
     const sorted = list.slice().sort((a, b) => b.score - a.score);
     return sorted.map((p, i) =>
-      '<div class="mp-player' + (p.uid === pvUid ? ' me' : '') + '"><span style="font-family:var(--mono); color:var(--slate); width:18px;">' + (i + 1) + '</span><span class="nm">' + esc(p.name) + '</span><span style="font-family:var(--display); font-size:20px; color:var(--gold);">' + p.score + '</span></div>'
+      '<div class="mp-player' + (p.uid === pvUid ? ' me' : '') + '"><span style="font-family:var(--mono); color:var(--slate); width:18px;">' + (i + 1) + '</span><span class="nm">' + esc(p.name) + (p.left ? ' <span style="color:var(--slate); font-size:0.8em;">(ausgestiegen)</span>' : '') + '</span><span style="font-family:var(--display); font-size:20px; color:var(--gold);">' + p.score + '</span></div>'
     ).join('');
   }
 
@@ -2991,7 +3093,7 @@
     pvGuessErr = '';
     pvSending = true;
     pvGuessBtn.disabled = true;
-    guessMsg('Sende …');
+    guessMsg(pvOfflineBar.style.display === 'block' ? 'Offline — dein Tipp wird gesendet, sobald du wieder online bist …' : 'Sende …');
     try{
       await db.ref('rooms/' + JOIN_CODE + '/guesses/' + pvUid).set({ round: pvRound.n, title: title, artist: artist, at: firebase.database.ServerValue.TIMESTAMP });
     }catch(e){
@@ -3020,8 +3122,22 @@
     pvJoinPanel.style.display = 'none';
     pvLobbyPanel.style.display = 'block';
 
+    // Offline-Leiste: erscheint, wenn die Verbindung zu Firebase (oder das Netz des Geräts) länger weg ist.
+    const OFFLINE_DELAY = window.PT_OFFLINE_DELAY_MS || 2500;
+    let fbOffline = false, offlineTimer = null;
+    const updateBar = () => { pvOfflineBar.style.display = (fbOffline || navigator.onLine === false) ? 'block' : 'none'; };
+    const onNet = () => updateBar();
+    window.addEventListener('online', onNet);
+    window.addEventListener('offline', onNet);
+    updateBar();
     const infoCb = infoRef.on('value', s => {
-      if(s.val() === true){ connRef.onDisconnect().set(false); connRef.set(true).catch(() => {}); }
+      clearTimeout(offlineTimer);
+      if(s.val() === true){
+        fbOffline = false; updateBar();
+        connRef.onDisconnect().set(false); connRef.set(true).catch(() => {});
+      }else{
+        offlineTimer = setTimeout(() => { fbOffline = true; updateBar(); }, OFFLINE_DELAY); // kurze Aussetzer ignorieren
+      }
     });
     // Herzschlag (siehe Host): korrigiert ein verspätetes "offline" einer alten Verbindung nach dem Neuladen.
     const beat = setInterval(() => {
@@ -3067,6 +3183,10 @@
 
     pvDetach = function(){
       clearInterval(beat);
+      clearTimeout(offlineTimer);
+      window.removeEventListener('online', onNet);
+      window.removeEventListener('offline', onNet);
+      pvOfflineBar.style.display = 'none';
       infoRef.off('value', infoCb);
       playersRef.off('value', playersCb);
       metaRef.off('value', metaCb);
@@ -3095,9 +3215,10 @@
       const existing = await pRef.once('value');
       // Jeder Wert einzeln an seinem eigenen Pfad — so greifen die Feld-Regeln eindeutig.
       if(existing.exists()){
-        await Promise.all([pRef.child('name').set(name), pRef.child('connected').set(true)]);
+        // Wiedereinstieg (auch nach "Spiel verlassen"): Markierung "ausgestiegen" entfernen
+        await Promise.all([pRef.child('name').set(name), pRef.child('connected').set(true), pRef.child('left').remove()]);
       }else{
-        if(meta.phase !== 'lobby') throw new Error('Das Spiel läuft schon — Beitritt jetzt nicht mehr möglich.');
+        if(meta.phase !== 'lobby' && meta.phase !== 'playing') throw new Error('Das Spiel ist vorbei — Beitritt jetzt nicht mehr möglich.');
         await Promise.all([
           pRef.child('name').set(name),
           pRef.child('connected').set(true),
@@ -3116,11 +3237,21 @@
     }
   }
 
+  // Lobby: Eintrag löschen. Im Spiel: nur als "ausgestiegen" markieren — der Punktestand bleibt in der Wertung,
+  // der Host überspringt den Spieler ab der nächsten Runde, und über den Link ist ein Wiedereinstieg möglich.
   async function pvLeave(){
+    const inGame = !!(pvMeta && pvMeta.phase !== 'lobby');
+    if(inGame && !window.confirm('Spiel wirklich verlassen? Dein Punktestand bleibt in der Wertung, und du kannst über den Link wieder einsteigen.')) return;
     const wasUid = pvUid;
     if(pvDetach) pvDetach();
-    try{ if(db && wasUid) await db.ref('rooms/' + JOIN_CODE + '/players/' + wasUid).remove(); }catch(e){ console.warn(e); }
-    showJoinPanel('');
+    try{
+      if(db && wasUid){
+        const pRef = db.ref('rooms/' + JOIN_CODE + '/players/' + wasUid);
+        if(inGame) await Promise.all([pRef.child('left').set(true), pRef.child('connected').set(false)]);
+        else await pRef.remove();
+      }
+    }catch(e){ console.warn(e); }
+    showJoinPanel(inGame ? 'Du hast das Spiel verlassen. Mit „Beitreten“ kommst du wieder rein.' : '');
   }
 
   async function startPlayerView(){
@@ -3130,6 +3261,7 @@
     if(JOIN_CODE.length !== 4){ pvJoinBtn.disabled = true; pvMsg('Ungültiger Beitritts-Link.', true); return; }
     pvJoinBtn.addEventListener('click', pvJoin);
     pvLeaveBtn.addEventListener('click', pvLeave);
+    document.querySelectorAll('.pv-leave').forEach(b => b.addEventListener('click', pvLeave));
     pvGuessBtn.addEventListener('click', pvSendGuess);
     pvNameInput.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); pvJoin(); } });
 
@@ -3140,7 +3272,8 @@
       const s = await db.ref('rooms/' + JOIN_CODE + '/players/' + pvUid).once('value');
       const meta = await db.ref('rooms/' + JOIN_CODE + '/meta').once('value');
       const m = meta.val();
-      if(s.exists() && s.val().name && m && m.phase !== 'ended') enterLobby(s.val().name);
+      if(s.exists() && s.val().name && !s.val().left && m && m.phase !== 'ended') enterLobby(s.val().name);
+      else if(s.exists() && s.val().left && m && m.phase !== 'ended') pvMsg('Du hast das Spiel verlassen. Mit „Beitreten“ kommst du wieder rein.');
     }catch(e){ console.warn(e); }
   }
 
