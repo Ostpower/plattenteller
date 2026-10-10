@@ -855,7 +855,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-10.5';
+  const APP_VERSION = '2026-10-10.6';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -2482,6 +2482,9 @@
   };
   const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // ohne I/O/0/1 — weniger Verwechslungen
   const HOST_ROOM_KEY = 'plattenteller_host_room';
+  // Aufräumen: Räume, deren Host seit 6 h nicht mehr verbunden war, und Räume älter als 48 h werden entfernt.
+  const ABANDONED_MS = 6 * 3600 * 1000;
+  const MAX_AGE_MS = 48 * 3600 * 1000;
   const PLAYER_NAME_KEY = 'plattenteller_player_name';
 
   const $ = id => document.getElementById(id);
@@ -2633,6 +2636,51 @@
     hostBeat = setInterval(() => { if(hostCode) hc.set(true).catch(() => {}); }, HEARTBEAT_MS);
   }
 
+  // Raum komplett löschen. Klappt das als Ganzes nicht (ältere Firebase-Regeln), die Teile einzeln — Spieler zuerst,
+  // die Meta-Daten zuletzt, weil die Regeln dort den Host prüfen.
+  async function deleteRoom(code, uid){
+    const r = db.ref('rooms/' + code);
+    try{
+      await r.remove();
+    }catch(e){
+      const ps = await r.child('players').once('value');
+      const tasks = [];
+      ps.forEach(ch => { tasks.push(r.child('players/' + ch.key).remove().catch(() => {})); });
+      await Promise.all(tasks);
+      await Promise.all(['round', 'guesses', 'results'].map(k => r.child(k).remove().catch(() => {})));
+      await r.child('meta').remove();
+    }
+    if(uid) await db.ref('hostRooms/' + uid + '/' + code).remove().catch(() => {});
+  }
+
+  // Räumt vergessene Räume dieses Hosts auf (geschlossene, verlassene, sehr alte). Den aktuellen Raum fasst es nie an.
+  // Fremde Räume sind tabu: Die Liste "hostRooms/<meine ID>" ist privat, und die Regeln erlauben nur dem Host das Löschen.
+  async function sweepOldRooms(exceptCode){
+    try{
+      const myUid = await ensureAuth();
+      const idxRef = db.ref('hostRooms/' + myUid);
+      const idx = (await idxRef.once('value')).val() || {};
+      const offset = (await db.ref('.info/serverTimeOffset').once('value')).val() || 0;
+      const now = Date.now() + offset;
+      let removed = 0;
+      for(const code of Object.keys(idx)){
+        if(code === exceptCode) continue;
+        const m = (await db.ref('rooms/' + code + '/meta').once('value')).val();
+        if(!m || m.hostUid !== myUid){ await idxRef.child(code).remove().catch(() => {}); continue; } // gibt es nicht mehr / gehört nicht mir
+        const age = now - (m.createdAt || 0);
+        const stale = m.phase === 'ended' || (m.hostConnected !== true && age > ABANDONED_MS) || age > MAX_AGE_MS;
+        if(!stale) continue;
+        await deleteRoom(code, myUid);
+        removed++;
+      }
+      if(removed > 0 && !mpHostMsg.textContent) hostMsg(removed + (removed === 1 ? ' alter Raum' : ' alte Räume') + ' aufgeräumt.');
+      return removed;
+    }catch(e){
+      console.warn('Aufräumen alter Räume nicht möglich (Firebase-Regeln aktuell?)', e);
+      return 0;
+    }
+  }
+
   async function createRoom(){
     hostMsg('');
     if(!initFb()){ hostMsg('Firebase konnte nicht geladen werden (Internetverbindung?).', true); return; }
@@ -2653,7 +2701,10 @@
         mode: 'sequential',
         hostConnected: true
       });
+      // Eigene Raumliste (privat) — daran erkennt das Aufräumen später vergessene Räume.
+      db.ref('hostRooms/' + myUid + '/' + code).set(firebase.database.ServerValue.TIMESTAMP).catch(e => console.warn('Raumliste nicht gespeichert (Firebase-Regeln aktuell?)', e));
       attachHostRoom(code);
+      sweepOldRooms(code);
     }catch(e){
       console.error(e);
       hostMsg('Raum konnte nicht erstellt werden: ' + friendlyError(e), true);
@@ -2673,6 +2724,7 @@
       const m = s.val();
       if(m && m.hostUid === myUid && m.phase !== 'ended'){
         attachHostRoom(code);
+        sweepOldRooms(code);
         if(m.phase !== 'lobby'){
           // Es lief ein Spiel: aus dem gesicherten Stand wiederherstellen. Klappt das nicht, Raum zurück in die Lobby,
           // damit die Handys nicht hängen.
@@ -2697,14 +2749,21 @@
     if(!hostCode) return;
     if(!window.confirm('Raum wirklich schließen? Alle Mitspieler werden getrennt.')) return;
     const code = hostCode;
+    const myUid = await ensureAuth().catch(() => null);
+    detachHost(); // stoppt Herzschlag und Live-Listener
+    hostCode = null;
+    try{ await db.ref('rooms/' + code + '/meta/hostConnected').onDisconnect().cancel(); }catch(e){} // sonst entstünde nach dem Löschen ein Rest
     try{ await db.ref('rooms/' + code + '/meta/phase').set('ended'); }
     catch(e){ console.warn(e); }
-    detachHost();
-    hostCode = null;
     try{ localStorage.removeItem(HOST_ROOM_KEY); localStorage.removeItem('plattenteller_host_game'); }catch(e){}
     mpRoomBox.style.display = 'none';
     mpCreateBtn.style.display = '';
     hostMsg('Raum ' + code + ' geschlossen.');
+    // Die Handys bekommen zuerst "Raum geschlossen" (phase=ended); kurz danach wird der Raum ganz gelöscht.
+    // Klappt das nicht (z. B. Seite sofort geschlossen), räumt es der nächste Start auf.
+    setTimeout(() => {
+      deleteRoom(code, myUid).catch(e => console.warn('Raum konnte nicht gelöscht werden — wird beim nächsten Aufräumen entfernt', e));
+    }, 2000);
   }
 
   async function copyLink(){
