@@ -593,12 +593,19 @@
 
     <div class="panel">
       <h2>3. Spieler</h2>
-      <p class="hint">Wer spielt mit? Reihenfolge = Zugreihenfolge.</p>
+      <p class="hint">Wer spielt mit? Reihenfolge = Zugreihenfolge (im Reihenfolge-Modus).</p>
       <div class="row">
         <input type="text" id="playerInput" placeholder="Name eingeben…" maxlength="18">
         <button class="btn-gold" id="addPlayerBtn" style="flex:0 0 auto;">+ Hinzufügen</button>
       </div>
       <div class="chip-list" id="playerChips"></div>
+
+      <label style="margin-top:16px;">Spielmodus</label>
+      <div class="pick-group" id="modeChips">
+        <div class="pick-chip selected" data-mode="sequential">Reihenfolge</div>
+        <div class="pick-chip" data-mode="together">Zusammen</div>
+      </div>
+      <p class="hint" id="modeHint" style="margin-top:-8px;">Reihenfolge: einer ist abwechselnd dran, mit Streak-Bonus &amp; Klau-Powerup. Zusammen: alle hören denselben Song und tippen parallel (eigenes Handy oder mündlich/Zettel — jede*r wird danach einzeln bewertet, kein Streak/Klau).</p>
     </div>
 
     <button class="btn-coral btn-block" id="startGameBtn" style="padding:15px; font-size:15px;" disabled>Spiel starten</button>
@@ -697,6 +704,29 @@
         <div id="roundBonusNote" class="empty-note" style="min-height:18px; margin-top:8px;"></div>
         <button class="btn-coral btn-block" id="nextRoundBtn" style="margin-top:14px;">Nächster Song →</button>
       </div>
+
+      <div class="guess-panel" id="togetherGuessPanel" style="display:none;">
+        <p class="hint" style="margin-bottom:14px;">Jede*r trägt hier seinen Tipp ein (eigenes Handy — Bildschirm den anderen nicht zeigen — oder mündlich/auf Zettel raten und eine Person überträgt es). Danach gemeinsam aufdecken.</p>
+        <div id="togetherGuessList"></div>
+        <button class="btn-gold btn-block" id="togetherRevealBtn" style="margin-top:6px;">Aufdecken</button>
+      </div>
+
+      <div class="guess-panel" id="togetherRevealPanel" style="display:none;">
+        <div class="reveal-card">
+          <img id="togetherRevealCover" src="" alt="" style="display:none;">
+          <div id="togetherRevealCoverPlaceholder" class="placeholder-cover" style="width:64px;height:64px;">♪</div>
+          <div>
+            <div class="rt" id="togetherRevealTitle"></div>
+            <div class="ra" id="togetherRevealArtist"></div>
+          </div>
+        </div>
+        <div id="togetherFunFactBox" style="display:none; font-family:var(--mono); font-size:12.5px; color:var(--slate); background:var(--groove); border-radius:10px; padding:10px 12px; margin:-6px 0 16px;">
+          💡 <span id="togetherFunFactText"></span>
+        </div>
+        <p class="hint" style="margin-bottom:10px;">Jede*r einzeln bewerten:</p>
+        <div id="togetherJudgeList"></div>
+        <button class="btn-coral btn-block" id="togetherNextRoundBtn" style="margin-top:8px;" disabled>Nächster Song →</button>
+      </div>
     </div>
   </div>
 
@@ -730,7 +760,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-09-26.1';
+  const APP_VERSION = '2026-09-26.2';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -1600,6 +1630,16 @@
 
   function checkStart(){ startGameBtn.disabled = !(players.length >= 1 && tracks.length >= 1); }
 
+  // ---------- MODE (Reihenfolge vs. Zusammen) ----------
+  let gameMode = 'sequential'; // 'sequential' | 'together'
+  const modeChipsEl = document.getElementById('modeChips');
+  [...modeChipsEl.children].forEach(chip => {
+    chip.onclick = () => {
+      gameMode = chip.getAttribute('data-mode');
+      [...modeChipsEl.children].forEach(c => c.classList.toggle('selected', c === chip));
+    };
+  });
+
   // ---------- GAME FLOW ----------
   const setupScreen = document.getElementById('setup-screen');
   const gameScreen = document.getElementById('game-screen');
@@ -1632,7 +1672,22 @@
   const stealBox = document.getElementById('stealBox');
   const stealToggle = document.getElementById('stealToggle');
 
-  const judgeButtons = document.querySelectorAll('.judge-grid button[data-score]');
+  const judgeButtons = document.querySelectorAll('#revealPanel .judge-grid button[data-score]');
+
+  const togetherGuessPanel = document.getElementById('togetherGuessPanel');
+  const togetherGuessList = document.getElementById('togetherGuessList');
+  const togetherRevealBtn = document.getElementById('togetherRevealBtn');
+  const togetherRevealPanel = document.getElementById('togetherRevealPanel');
+  const togetherRevealCover = document.getElementById('togetherRevealCover');
+  const togetherRevealCoverPlaceholder = document.getElementById('togetherRevealCoverPlaceholder');
+  const togetherRevealTitle = document.getElementById('togetherRevealTitle');
+  const togetherRevealArtist = document.getElementById('togetherRevealArtist');
+  const togetherFunFactBox = document.getElementById('togetherFunFactBox');
+  const togetherFunFactText = document.getElementById('togetherFunFactText');
+  const togetherJudgeList = document.getElementById('togetherJudgeList');
+  const togetherNextRoundBtn = document.getElementById('togetherNextRoundBtn');
+  let togetherGuesses = [];
+  let togetherJudgedCount = 0;
 
   let totalDeckSize = 0;
   let roundJudged = false; // pro Runde nur eine Bewertung — verhindert doppelte Punkte per Doppelklick
@@ -1679,7 +1734,7 @@
     const maxScore = Math.max(0, ...players.map(p => p.score));
     players.forEach((p,i) => {
       const isLeader = p.score > 0 && p.score === maxScore;
-      const isActive = i === currentPlayerIdx;
+      const isActive = gameMode === 'sequential' && i === currentPlayerIdx;
       const chip = document.createElement('div');
       chip.className = 'score-chip' + (isActive ? ' active' : '');
       const streakTag = (p.streak && p.streak >= 2) ? ` <span title="Streak">🔥${p.streak}</span>` : '';
@@ -1712,19 +1767,33 @@
     isPlaying = false;
     brandDot.classList.remove('is-playing');
     nowStatus.textContent = 'Bereit — Kassette antippen';
-    guessTitle.value = ''; guessArtist.value = '';
-    guessPanel.style.display = 'block';
-    revealPanel.style.display = 'none';
-    roundBonusNote.textContent = '';
-    roundJudged = false;
-    judgeButtons.forEach(b => { b.disabled = false; b.classList.remove('judged'); });
-    nextRoundBtn.disabled = true; // erst nach der Bewertung weiter
 
-    const currentPlayer = players[currentPlayerIdx];
-    const canSteal = currentPlayer && currentPlayer.stealAvailable && !currentPlayer.stealUsed;
-    stealBox.style.display = canSteal ? 'block' : 'none';
-    stealToggle.checked = false;
+    if(gameMode === 'together'){
+      guessPanel.style.display = 'none';
+      revealPanel.style.display = 'none';
+      stealBox.style.display = 'none';
+      togetherGuesses = [];
+      togetherJudgedCount = 0;
+      renderTogetherGuessPanel();
+      togetherGuessPanel.style.display = 'block';
+      togetherRevealPanel.style.display = 'none';
+      togetherNextRoundBtn.disabled = true;
+    } else {
+      togetherGuessPanel.style.display = 'none';
+      togetherRevealPanel.style.display = 'none';
+      guessTitle.value = ''; guessArtist.value = '';
+      guessPanel.style.display = 'block';
+      revealPanel.style.display = 'none';
+      roundBonusNote.textContent = '';
+      roundJudged = false;
+      judgeButtons.forEach(b => { b.disabled = false; b.classList.remove('judged'); });
+      nextRoundBtn.disabled = true; // erst nach der Bewertung weiter
 
+      const currentPlayer = players[currentPlayerIdx];
+      const canSteal = currentPlayer && currentPlayer.stealAvailable && !currentPlayer.stealUsed;
+      stealBox.style.display = canSteal ? 'block' : 'none';
+      stealToggle.checked = false;
+    }
 
     if(t.source === 'deezer'){
       deezerAudio.pause();
@@ -1881,6 +1950,120 @@
     if(!roundJudged) return;
     currentPlayerIdx = (currentPlayerIdx + 1) % players.length;
     renderScoreboard();
+    loadNextTrack();
+  };
+
+  // ---------- ZUSAMMEN-MODUS: alle raten parallel, jede*r wird einzeln bewertet ----------
+  function renderTogetherGuessPanel(){
+    togetherGuessList.innerHTML = '';
+    players.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'field';
+      row.innerHTML = `
+        <label style="color:var(--gold);">${escapeHtml(p.name)}</label>
+        <div class="row">
+          <input type="text" class="together-guess-title" data-idx="${i}" placeholder="Songtitel…">
+          <input type="text" class="together-guess-artist" data-idx="${i}" placeholder="Interpret…">
+        </div>
+      `;
+      togetherGuessList.appendChild(row);
+    });
+  }
+
+  togetherRevealBtn.onclick = () => {
+    const t = tracks[currentTrackId];
+    if(t && t.source === 'deezer'){ deezerAudio.pause(); } else if(controller){ controller.pause(); }
+
+    togetherGuesses = players.map((p, i) => {
+      const titleEl = togetherGuessList.querySelector('.together-guess-title[data-idx="' + i + '"]');
+      const artistEl = togetherGuessList.querySelector('.together-guess-artist[data-idx="' + i + '"]');
+      return { title: titleEl ? titleEl.value : '', artist: artistEl ? artistEl.value : '' };
+    });
+
+    togetherGuessPanel.style.display = 'none';
+    togetherRevealPanel.style.display = 'block';
+
+    togetherRevealTitle.textContent = t.title;
+    togetherRevealArtist.textContent = t.artist;
+    if(t.cover){
+      togetherRevealCover.src = t.cover; togetherRevealCover.style.display = 'block';
+      togetherRevealCoverPlaceholder.style.display = 'none';
+    }else{
+      togetherRevealCover.style.display = 'none';
+      togetherRevealCoverPlaceholder.style.display = 'flex';
+    }
+    if(t.funFact){
+      togetherFunFactText.textContent = t.funFact;
+      togetherFunFactBox.style.display = 'block';
+    }else{
+      togetherFunFactBox.style.display = 'none';
+    }
+
+    labelTitle.textContent = t.title;
+    labelArtist.textContent = t.artist;
+    requestAnimationFrame(() => {
+      labelTitle.classList.add('shown');
+      setTimeout(() => labelArtist.classList.add('shown'), 180);
+    });
+
+    renderTogetherJudgeList(t);
+  };
+
+  function renderTogetherJudgeList(t){
+    togetherJudgedCount = 0;
+    togetherNextRoundBtn.disabled = true;
+    togetherJudgeList.innerHTML = '';
+    const realTitle = normalize(t.title);
+    const realArtist = normalize(t.artist);
+
+    players.forEach((p, i) => {
+      const guess = togetherGuesses[i] || { title: '', artist: '' };
+      const guessedTitle = normalize(guess.title);
+      const guessedArtist = normalize(guess.artist);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'panel';
+      wrap.style.padding = '14px';
+      wrap.style.marginBottom = '10px';
+      wrap.innerHTML = `
+        <label style="color:var(--gold); margin-bottom:8px; display:block;">${escapeHtml(p.name)}</label>
+        <div class="judge-grid">
+          <button class="btn-ghost" data-score="2">Beides richtig (+2)</button>
+          <button class="btn-ghost" data-score="1a">Nur Titel (+1)</button>
+          <button class="btn-ghost" data-score="1b">Nur Interpret (+1)</button>
+          <button class="btn-ghost" data-score="0">Nichts richtig</button>
+        </div>
+      `;
+      const rowButtons = [...wrap.querySelectorAll('.judge-grid button[data-score]')];
+      const bothBtn = wrap.querySelector('[data-score="2"]');
+      // Grobe Trefferanzeige wie im Reihenfolge-Modus: markiert die Beides-richtig-Option vorab,
+      // wenn Eintrag und echter Titel/Interpret sich (nach Normalisierung) überschneiden.
+      bothBtn.style.borderColor =
+        (guessedTitle && realTitle.includes(guessedTitle)) && (guessedArtist && realArtist.includes(guessedArtist))
+          ? 'var(--gold)' : 'rgba(255,255,255,0.15)';
+
+      let rowJudged = false;
+      rowButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          if(rowJudged) return;
+          rowJudged = true;
+          rowButtons.forEach(b => { b.disabled = true; });
+          btn.classList.add('judged');
+          const val = btn.getAttribute('data-score');
+          let pts = 0;
+          if(val === '2') pts = 2; else if(val === '1a' || val === '1b') pts = 1;
+          p.score += pts;
+          renderScoreboard();
+          togetherJudgedCount++;
+          togetherNextRoundBtn.disabled = togetherJudgedCount < players.length;
+        });
+      });
+      togetherJudgeList.appendChild(wrap);
+    });
+  }
+
+  togetherNextRoundBtn.onclick = () => {
+    if(togetherJudgedCount < players.length) return;
     loadNextTrack();
   };
 
