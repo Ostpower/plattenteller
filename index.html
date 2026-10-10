@@ -6,489 +6,296 @@
 <title>Plattenteller</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#0b0d10">
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <style>
   :root{
-    --ink:#12141c;
-    --panel:#1c1f2b;
-    --panel-2:#242838;
-    --gold:#e8b44c;
-    --coral:#e8503a;
-    --cream:#f1eee6;
-    --slate:#a7acc2;
-    --groove:#0b0d13;
-    --green:#5fb98a;
+    --ink:#0b0d10;
+    --panel:#101318;
+    --panel-2:#161a20;
+    --groove:#14181d;
+    --line:rgba(255,255,255,0.09);
+    --line-2:rgba(255,255,255,0.17);
+    --cream:#f2f5f4;
+    --slate:#8b949e;
+    --dim:#6b737c;
+    --gold:#3ddc97;
+    --gold-ink:#04130c;
+    --coral:#ff6b6b;
+    --green:#3ddc97;
     --radius:16px;
-    --display: 'Bebas Neue', sans-serif;
-    --body: 'Space Grotesk', sans-serif;
-    --mono: 'IBM Plex Mono', monospace;
-    --hand: 'Caveat', cursive;
+    --display:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --body:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mono:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
+  html{-webkit-text-size-adjust:100%;}
   body{
-    background:
-      radial-gradient(ellipse at 20% -10%, rgba(232,180,76,0.10), transparent 55%),
-      radial-gradient(ellipse at 100% 110%, rgba(232,80,58,0.10), transparent 50%),
-      var(--ink);
+    background:var(--ink);
     color:var(--cream);
     font-family:var(--body);
+    font-size:15px;
+    line-height:1.5;
     min-height:100vh;
-    padding:28px 16px 60px;
+    padding:26px 16px 64px;
     -webkit-font-smoothing:antialiased;
+    font-variant-numeric:tabular-nums;
   }
-  .wrap{max-width:720px; margin:0 auto;}
-  .eyebrow{
-    font-family:var(--mono);
-    font-size:11px;
-    letter-spacing:0.22em;
-    text-transform:uppercase;
-    color:var(--gold);
-    margin-bottom:6px;
-  }
+  ::selection{background:rgba(61,220,151,0.3);}
+  .wrap{max-width:560px; margin:0 auto;}
+  .eyebrow{font-size:12.5px; font-weight:500; color:var(--gold); margin-bottom:8px;}
   h1.title{
-    font-family:var(--display);
-    font-size:clamp(40px,9vw,64px);
-    letter-spacing:0.01em;
-    line-height:0.9;
-    color:var(--cream);
-    margin-bottom:6px;
+    font-size:clamp(34px,8vw,48px); font-weight:700; letter-spacing:-0.035em;
+    line-height:1; color:var(--cream); margin-bottom:10px;
   }
-  .subtitle{color:var(--slate); font-size:14.5px; margin-bottom:28px; max-width:52ch;}
+  h1.title::after, .gate-box h1::after{content:'.'; color:var(--gold);}
+  .subtitle{color:var(--slate); font-size:14.5px; margin-bottom:26px; max-width:46ch;}
+
   .panel{
     background:var(--panel);
-    border:1px solid rgba(255,255,255,0.06);
-    border-radius:var(--radius);
-    padding:22px;
-    margin-bottom:18px;
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:20px;
+    margin-bottom:14px;
   }
-  .panel h2{
-    font-family:var(--display);
-    font-size:22px;
-    letter-spacing:0.03em;
-    color:var(--cream);
-    margin-bottom:4px;
-  }
-  .panel .hint{color:var(--slate); font-size:13px; margin-bottom:16px; line-height:1.5;}
-  label{
-    display:block;
-    font-family:var(--mono);
-    font-size:10.5px;
-    letter-spacing:0.12em;
-    text-transform:uppercase;
-    color:var(--slate);
-    margin-bottom:6px;
-  }
+  .panel h2{font-size:17px; font-weight:600; letter-spacing:-0.01em; color:var(--cream); margin-bottom:4px;}
+  .panel .hint{color:var(--slate); font-size:13px; margin-bottom:16px; line-height:1.55;}
+  .hint{line-height:1.55;}
+  label{display:block; font-size:12px; font-weight:500; color:var(--slate); margin-bottom:6px;}
+  [style*="--display"]{font-weight:600; letter-spacing:-0.02em;}
+
   input[type=text], input[type=password], input[type=number]{
-    width:100%;
+    width:100%; height:46px;
     background:var(--groove);
-    border:1px solid rgba(255,255,255,0.08);
-    border-radius:10px;
-    padding:11px 13px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:0 14px;
     color:var(--cream);
     font-family:var(--body);
-    font-size:14.5px;
+    font-size:15px;
     outline:none;
-    transition:border-color .15s;
+    transition:border-color .15s, background .15s;
   }
-  input:focus{border-color:var(--gold);}
+  input::placeholder{color:var(--dim);}
+  input:focus{border-color:var(--gold); background:#161b21;}
   .row{display:flex; gap:10px;}
   .row > *{flex:1;}
   .field{margin-bottom:12px;}
+  .stack{display:flex; flex-direction:column; gap:8px;}
+
   button{
-    font-family:var(--body);
-    font-weight:600;
-    font-size:14px;
-    border:none;
-    border-radius:10px;
-    padding:11px 18px;
+    font-family:var(--body); font-weight:600; font-size:14.5px;
+    border:none; border-radius:12px;
+    padding:0 18px; min-height:44px;
     cursor:pointer;
     transition:transform .1s, opacity .15s, background .15s, border-color .15s, color .15s;
   }
-  button:active{transform:scale(0.97);}
+  button:active{transform:scale(0.98);}
   button:disabled{opacity:0.35; cursor:not-allowed;}
-  .btn-gold{background:var(--gold); color:#241a06;}
-  .btn-gold:hover:not(:disabled){background:#f0c062;}
-  .btn-coral{background:var(--coral); color:#fff;}
-  .btn-coral:hover:not(:disabled){background:#f16a52;}
-  .btn-ghost{background:transparent; color:var(--cream); border:1px solid rgba(255,255,255,0.15);}
+  button:focus-visible, .play-pill:focus-visible{outline:2px solid var(--gold); outline-offset:2px;}
+  .btn-gold, .btn-coral{background:var(--gold); color:var(--gold-ink);}
+  .btn-gold:hover:not(:disabled), .btn-coral:hover:not(:disabled){background:#5fe8ae;}
+  .btn-ghost{background:transparent; color:var(--cream); border:1px solid var(--line-2);}
   .btn-ghost:hover:not(:disabled){border-color:var(--gold); color:var(--gold);}
+  .btn-line{background:transparent; color:var(--gold); border:1px solid var(--gold);}
+  .btn-line:hover:not(:disabled){background:rgba(61,220,151,0.1);}
   .btn-block{width:100%;}
-  .btn-sm{padding:7px 12px; font-size:12.5px; border-radius:8px;}
+  .btn-sm{min-height:34px; padding:0 12px; font-size:12.5px; border-radius:10px;}
 
-  details.advanced{margin-top:16px; border-top:1px solid rgba(255,255,255,0.07); padding-top:14px;}
-  details.advanced summary{
-    cursor:pointer; font-family:var(--mono); font-size:11.5px; letter-spacing:0.08em;
-    text-transform:uppercase; color:var(--slate);
-  }
-  details.advanced summary:hover{color:var(--gold);}
+  details.advanced{margin-top:18px; border-top:1px solid var(--line); padding-top:14px;}
+  details.advanced summary{cursor:pointer; font-size:13.5px; font-weight:500; color:var(--slate); list-style:none;}
+  details.advanced summary::-webkit-details-marker{display:none;}
+  details.advanced summary::before{content:'+'; display:inline-block; width:18px; color:var(--gold); font-weight:600;}
+  details.advanced[open] summary::before{content:'–';}
+  details.advanced summary:hover{color:var(--cream);}
   details.advanced[open] summary{margin-bottom:12px;}
 
   .chip-list{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}
   .chip{
     display:flex; align-items:center; gap:8px;
-    background:var(--groove);
-    border:1px solid rgba(255,255,255,0.08);
-    border-radius:999px;
-    padding:6px 8px 6px 14px;
-    font-size:13.5px;
+    background:var(--groove); border:1px solid var(--line);
+    border-radius:999px; padding:5px 6px 5px 14px; font-size:13.5px;
   }
   .chip button{
-    background:rgba(232,80,58,0.15); color:var(--coral);
-    border-radius:999px; width:20px; height:20px; padding:0;
-    display:flex; align-items:center; justify-content:center;
-    font-size:13px; line-height:1;
+    background:rgba(255,107,107,0.14); color:var(--coral);
+    border-radius:999px; width:22px; height:22px; min-height:0; padding:0;
+    display:flex; align-items:center; justify-content:center; font-size:14px; line-height:1;
   }
-
   .pick-chip{
-    background:var(--groove);
-    border:1px solid rgba(255,255,255,0.1);
-    border-radius:999px;
-    padding:8px 15px;
-    font-size:13px;
-    font-weight:500;
-    color:var(--cream);
-    cursor:pointer;
+    background:var(--groove); border:1px solid var(--line); border-radius:999px;
+    padding:8px 15px; font-size:13px; font-weight:500; color:var(--cream); cursor:pointer;
+    transition:border-color .15s, color .15s, background .15s;
   }
-  .pick-chip.selected{
-    background:rgba(232,180,76,0.15);
-    border-color:var(--gold);
-    color:var(--gold);
-    font-weight:600;
-  }
+  .pick-chip:hover{border-color:var(--line-2);}
+  .pick-chip.selected{background:rgba(61,220,151,0.12); border-color:var(--gold); color:var(--gold); font-weight:600;}
   .pick-group{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;}
 
-  .connect-status{
-    display:flex; align-items:center; gap:8px;
-    font-family:var(--mono); font-size:12.5px; color:var(--slate);
-    margin-top:10px;
-  }
-  .dot{width:8px; height:8px; border-radius:50%; background:var(--slate); flex-shrink:0;}
+  .connect-status{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--slate); margin-top:12px;}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--dim); flex-shrink:0;}
   .dot.ok{background:var(--green);}
   .dot.err{background:var(--coral);}
 
   .track-item{
     display:flex; align-items:center; gap:12px;
-    background:var(--groove);
-    border:1px solid rgba(255,255,255,0.07);
-    border-radius:12px;
-    padding:10px 12px;
-    margin-top:10px;
+    background:var(--groove); border:1px solid var(--line);
+    border-radius:14px; padding:9px 12px; margin-top:8px;
   }
-  .track-item img{width:42px; height:42px; border-radius:6px; object-fit:cover; flex-shrink:0; background:#333;}
-  .track-item .placeholder-cover{
-    width:42px; height:42px; border-radius:6px; flex-shrink:0;
-    background:linear-gradient(135deg, var(--panel-2), var(--groove));
-    display:flex; align-items:center; justify-content:center;
-    color:var(--slate); font-size:16px;
+  .track-item img{width:42px; height:42px; border-radius:8px; object-fit:cover; flex-shrink:0; background:#222831;}
+  .placeholder-cover{
+    width:42px; height:42px; border-radius:8px; flex-shrink:0; background:#1b2027;
+    display:flex; align-items:center; justify-content:center; color:var(--dim); font-size:16px;
   }
   .track-meta{flex:1; min-width:0;}
   .track-meta .t{font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .track-meta .a{color:var(--slate); font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .track-count{
-    font-family:var(--mono); font-size:11px; color:var(--gold);
-    background:rgba(232,180,76,0.1); border-radius:999px;
-    padding:3px 10px; display:inline-block; margin-bottom:6px;
-  }
+  .track-count{font-size:12px; font-weight:500; color:var(--gold); background:rgba(61,220,151,0.1); border-radius:999px; padding:3px 10px; display:inline-block; margin-bottom:6px;}
 
-  .scoreboard{display:flex; gap:10px; overflow-x:auto; overflow-y:visible; padding:8px 4px 14px; margin:-8px -4px 16px; -webkit-overflow-scrolling:touch;}
-  .score-chip{
-    flex-shrink:0;
-    background:linear-gradient(180deg, var(--panel), var(--panel) 60%, rgba(0,0,0,0.15));
-    border:2px solid rgba(255,255,255,0.06);
-    border-radius:16px;
-    padding:14px 22px 16px;
-    text-align:center;
-    min-width:128px;
-    position:relative;
-    transition: border-color .25s, background .25s, transform .2s;
-  }
-  .score-chip.active{
-    border-color:var(--coral);
-    background:linear-gradient(180deg, var(--panel-2), rgba(232,80,58,0.08));
-    transform:translateY(-2px);
-    box-shadow:0 8px 22px rgba(232,80,58,0.18);
-  }
-  .score-chip .turn-badge{
-    display:inline-block;
-    font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:0.1em;
-    color:#2a0f0a; background:var(--coral);
-    border-radius:999px; padding:3px 10px;
-    margin-bottom:8px;
-  }
-  .score-chip .name{
-    font-size:17px; color:var(--cream); font-weight:700; margin-bottom:6px;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    display:flex; align-items:center; justify-content:center; gap:5px;
-  }
-  .score-chip.active .name{color:var(--cream);}
-  .score-chip .name .crown{font-size:15px;}
-  .score-chip .pts{font-family:var(--display); font-size:38px; letter-spacing:0.02em; line-height:1; color:var(--gold);}
-  .score-chip .pts::after{content:' PKT'; font-family:var(--mono); font-size:9px; color:var(--slate); letter-spacing:0.05em; vertical-align:3px;}
+  /* ---------- Spielscreen ---------- */
+  .panel.stage{background:transparent; border:none; padding:2px 0 0; margin-bottom:0;}
+  .deck-head{display:flex; justify-content:space-between; align-items:flex-end;}
+  .deck-num{font-size:64px; font-weight:600; letter-spacing:-0.045em; line-height:0.9;}
+  .deck-num.d3{font-size:52px;}
+  .deck-side{text-align:right; padding-bottom:5px; font-size:13px; color:var(--slate);}
+  .deck-side .rest{display:block; font-size:12px; color:var(--dim); margin-top:2px;}
+  .deck-ticks{display:flex; gap:4px; height:4px; margin:12px 0 20px;}
+  .deck-ticks i{flex:1; border-radius:2px; background:#1b2027;}
+  .deck-ticks i.on{background:var(--gold);}
+  .deck-ticks.bar{display:block; border-radius:2px; background:#1b2027; overflow:hidden;}
+  .deck-ticks.bar b{display:block; height:100%; background:var(--gold); border-radius:2px; transition:width .5s cubic-bezier(.4,0,.2,1);}
 
-  .stage{display:flex; flex-direction:column; align-items:center; padding:28px 20px 14px; position:relative;}
+  .eq{display:flex; align-items:center; justify-content:center; gap:5px; height:88px; margin:0 0 14px;}
+  .eq .bar{
+    display:block; width:5px; border-radius:3px; background:#2a313a; transform-origin:center;
+    animation:eq 1.1s ease-in-out infinite paused; transition:background .3s;
+  }
+  .eq.spin .bar{background:var(--gold); animation-play-state:running;}
+  .eq-sm{height:56px; margin-bottom:10px;}
+  @keyframes eq{0%,100%{transform:scaleY(0.2);} 50%{transform:scaleY(1);}}
 
-  .deck-progress{width:100%; max-width:340px; margin-bottom:26px;}
-  .deck-progress-label{
-    display:flex; justify-content:space-between; align-items:baseline;
-    font-family:var(--mono); font-size:11px; font-weight:500; color:var(--slate); letter-spacing:0.08em;
-    margin-bottom:7px;
+  .play-pill{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    height:58px; border-radius:18px; background:var(--gold); color:var(--gold-ink);
+    font-weight:600; font-size:16px; cursor:pointer; user-select:none; -webkit-user-select:none;
+    -webkit-tap-highlight-color:transparent; transition:transform .1s, background .15s;
   }
-  .deck-progress-label .num{color:var(--gold);}
-  .deck-progress-track{
-    height:5px; border-radius:999px; background:var(--groove);
-    overflow:hidden; box-shadow:inset 0 1px 2px rgba(0,0,0,0.4);
-  }
-  .deck-progress-fill{
-    height:100%; border-radius:999px;
-    background:linear-gradient(90deg, var(--coral), var(--gold));
-    transition: width .5s cubic-bezier(.4,0,.2,1);
-  }
+  .play-pill:hover{background:#5fe8ae;}
+  .play-pill:active{transform:scale(0.985);}
+  .play-pill .ico-play{width:0; height:0; border-style:solid; border-width:8px 0 8px 13px; border-color:transparent transparent transparent currentColor;}
+  .play-pill .ico-pause{display:none; gap:4px;}
+  .play-pill .ico-pause i{display:block; width:4px; height:16px; border-radius:1px; background:currentColor;}
+  .play-pill .lbl-pause{display:none;}
+  .play-stage.playing .ico-play, .play-stage.playing .lbl-play{display:none;}
+  .play-stage.playing .ico-pause{display:flex;}
+  .play-stage.playing .lbl-pause{display:inline;}
 
-  .cassette-stage{
-    position:relative; width:280px; height:225px;
-    display:flex; align-items:flex-start; justify-content:center;
-    margin-bottom:8px;
-  }
-  .turntable-glow{
-    position:absolute; width:300px; height:220px; border-radius:24px;
-    background: radial-gradient(circle, rgba(232,180,76,0.18), rgba(232,80,58,0.08) 55%, transparent 75%);
-    opacity:0; transition: opacity .6s ease;
-    filter: blur(6px);
-  }
-  .cassette-stage.playing .turntable-glow{ opacity:1; animation: pulse-glow 2.6s ease-in-out infinite; }
-  @keyframes pulse-glow{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.035); } }
+  .status-row{display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px; min-height:18px;}
+  .brand-dot{width:7px; height:7px; border-radius:50%; background:var(--dim); transition:background .2s;}
+  .brand-dot.is-playing{background:var(--gold);}
+  .now-status{font-size:13px; color:var(--slate);}
 
-  .cassette-assembly{
-    position:relative; width:280px; cursor:pointer;
-    transition: transform .25s ease;
-  }
-  .cassette-assembly:hover .cassette{ filter:brightness(1.03); }
-  .cassette-assembly:active .cassette{ filter:brightness(0.97); }
-  .cassette-stage.playing .cassette-assembly{ transform: translateY(-2px); }
+  .now-meta{text-align:center; min-height:64px; margin:12px 0 2px; display:flex; flex-direction:column; align-items:center; justify-content:center;}
+  .now-hidden{font-size:13px; color:var(--dim);}
+  .now-meta:has(#labelTitle.shown){display:none;}
+  .now-meta span{display:block; opacity:0; transform:translateY(6px); transition:opacity .35s ease, transform .35s ease;}
+  .now-meta span.shown{opacity:1; transform:none;}
+  #labelTitle{font-size:22px; font-weight:600; letter-spacing:-0.02em; line-height:1.2;}
+  #labelArtist{font-size:15px; color:var(--slate); margin-top:3px;}
 
-  .cassette-ground-shadow{
-    position:absolute; left:50%; bottom:-10px; transform:translateX(-50%);
-    width:76%; height:20px; border-radius:50%;
-    background: radial-gradient(ellipse at center, rgba(0,0,0,0.5), transparent 72%);
-    transition: opacity .25s ease, width .25s ease;
-  }
-  .cassette-stage.playing .cassette-ground-shadow{ opacity:0.7; width:70%; }
-
-  .cassette{
-    position:relative; width:280px; height:auto;
-    background: linear-gradient(165deg, #f1ecdd 0%, #e2dac2 55%, #cec49f 100%);
-    border:1px solid rgba(60,50,30,0.22);
-    border-radius:9px 9px 4px 4px;
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.75),
-      inset 0 -10px 16px rgba(60,50,20,0.08),
-      0 1px 2px rgba(0,0,0,0.25),
-      0 16px 28px rgba(0,0,0,0.4);
-    padding:13px 15px 8px;
-    display:flex; flex-direction:column;
-  }
-  .cassette::after{
-    content:'';
-    position:absolute; inset:0; border-radius:9px 9px 4px 4px;
-    background: linear-gradient(120deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.12) 16%, transparent 30%);
-    pointer-events:none;
-  }
-  .cassette-screw{
-    position:absolute; width:8px; height:8px; border-radius:50%;
-    background: radial-gradient(circle at 35% 30%, #938a70, #4a4436 70%);
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.45), 0 1px 1px rgba(255,255,255,0.4);
-    z-index:1;
-  }
-  .cassette-screw.tl{top:8px; left:8px;} .cassette-screw.tr{top:8px; right:8px;}
-  .cassette-screw.bl{bottom:8px; left:8px;} .cassette-screw.br{bottom:8px; right:8px;}
-
-  .cassette-label{
-    background:#f6f1e4;
-    border-radius:5px;
-    padding:8px 14px 5px;
-    margin:1px 6px 8px;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
-  }
-  .label-line{
-    border-bottom:1.5px solid #a7b4d6;
-    height:24px;
-    display:flex; align-items:flex-end;
-    padding-bottom:2px;
-  }
-  .label-line.ghost{ opacity:0.5; height:12px; }
-  .label-line span{
-    font-family:var(--hand); font-size:19px; font-weight:700;
-    color:#1c2340; line-height:1;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
-    opacity:0; transform:translateY(4px);
-    transition: opacity .45s ease, transform .45s ease;
-  }
-  .label-line span.shown{ opacity:1; transform:translateY(0); }
-
-  .cassette-stripe{
-    background: linear-gradient(180deg, #e2543f, #d0402c);
-    border-radius:4px;
-    margin:0 4px 7px;
-    padding:7px;
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.25), inset 0 -1px 0 rgba(255,255,255,0.15);
-  }
-  .cassette-window{
-    height:46px;
-    background: linear-gradient(180deg, #0c0d12, #050506);
-    border-radius:4px;
-    position:relative;
-    display:flex; align-items:center; justify-content:space-between;
-    padding:0 18px;
-    box-shadow: inset 0 2px 6px rgba(0,0,0,0.8);
-    overflow:hidden;
-  }
-  .reel-wrap{ position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 18px; }
-  .reel{
-    position:relative;
-    width:34px; height:34px; border-radius:50%;
-    background: radial-gradient(circle, #d8dbe2 0%, #d8dbe2 28%, transparent 29%),
-                conic-gradient(#9aa0b0 0deg 30deg, transparent 30deg 60deg,
-                  #9aa0b0 60deg 90deg, transparent 90deg 120deg,
-                  #9aa0b0 120deg 150deg, transparent 150deg 180deg,
-                  #9aa0b0 180deg 210deg, transparent 210deg 240deg,
-                  #9aa0b0 240deg 270deg, transparent 270deg 300deg,
-                  #9aa0b0 300deg 330deg, transparent 330deg 360deg);
-    box-shadow: 0 0 0 2px #1a1b21, 0 2px 6px rgba(0,0,0,0.6);
-  }
-  .reel-hub{
-    position:absolute; width:11px; height:11px; border-radius:50%;
-    background:#14151a; margin:11.5px;
-    box-shadow: inset 0 0 0 2px #2a2c34;
-  }
-  .reel-wrap.spin .reel{ animation: spin 1.8s linear infinite; }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
-  .tape-arc{
-    position:absolute; left:50%; top:6px; transform:translateX(-50%);
-    width:110px; height:14px;
-    border:2px solid #3a3d4a; border-top:none;
-    border-radius:0 0 55px 55px;
-    opacity:0.6;
-  }
-  .tap-hint{
-    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-    width:32px; height:32px; border-radius:50%;
-    background:rgba(0,0,0,0.4);
-    color:#f4efe2; font-size:12px;
-    display:flex; align-items:center; justify-content:center;
-    padding-left:2px;
-    opacity:0.9; transition:opacity .3s ease;
-    pointer-events:none; z-index:2;
-  }
-  .cassette-stage.playing .tap-hint{ opacity:0; }
-
-  .cassette-footer{
-    display:flex; align-items:center; gap:6px;
-    padding:7px 11px 0;
-    font-family:var(--mono); font-size:10px; letter-spacing:0.06em; color:#6b6455;
-  }
-  .brand-dot{width:6px; height:6px; border-radius:50%; background:var(--coral); flex-shrink:0; transition: background .2s ease;}
-  .brand-dot.is-playing{ background: var(--green); }
-  .brand-name{text-transform:uppercase; font-weight:700; color:#33301f; font-size:9px;}
-  .tape-type{margin-left:auto; color:var(--coral); font-weight:700;}
-
-  .cassette-tray{
-    position:relative; width:64%; height:22px; margin:1px auto 0;
-    background: linear-gradient(165deg, #e2dac2 0%, #cec49f 100%);
-    border:1px solid rgba(60,50,30,0.2); border-top:none;
-    clip-path: polygon(12% 0%, 88% 0%, 76% 100%, 24% 100%);
-    box-shadow: 0 8px 12px rgba(0,0,0,0.35);
-  }
-  .tray-slot{
-    position:absolute; top:5px; width:15px; height:5px; border-radius:2px;
-    background:#15161c; box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
-  }
-  .tray-slot.a{ left:26%; } .tray-slot.b{ right:26%; }
-  .tray-hole{
-    position:absolute; bottom:3px; width:7px; height:7px; border-radius:50%;
-    background:#15161c; box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
-  }
-  .tray-hole.a{ left:38%; } .tray-hole.b{ right:38%; }
-
-  .now-status{font-family:var(--mono); font-size:12px; color:var(--slate); letter-spacing:0.08em; min-height:16px; text-transform:uppercase; margin-top:18px;}
-
-
-  .guess-panel{width:100%; max-width:420px; margin-top:20px;}
-
+  .guess-panel{width:100%; margin-top:14px;}
   .reveal-card{
     display:flex; gap:14px; align-items:center;
-    background:var(--panel-2); border:1px solid rgba(232,180,76,0.25);
-    border-radius:14px; padding:14px; margin:18px 0;
+    background:var(--panel-2); border:1px solid var(--line);
+    border-radius:16px; padding:12px; margin:14px 0;
   }
-  .reveal-card img{width:64px; height:64px; border-radius:8px; object-fit:cover; background:#333;}
-  .reveal-card .rt{font-weight:700; font-size:16px;}
+  .panel > .reveal-card:first-child{margin-top:0;}
+  .reveal-card img{width:64px; height:64px; border-radius:10px; object-fit:cover; background:#222831;}
+  .reveal-card .rt{font-weight:600; font-size:16px;}
   .reveal-card .ra{color:var(--slate); font-size:13.5px;}
 
-  .judge-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px;}
-  .judge-grid button{padding:12px 8px; font-size:13px;}
-  .judge-grid button.judged:disabled{opacity:1; border-color:var(--gold) !important; color:var(--gold);}
+  .judge-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;}
+  .judge-grid button{min-height:46px; padding:0 8px; font-size:13px;}
+  .judge-grid button.judged:disabled{opacity:1; border-color:var(--gold) !important; color:var(--gold); background:rgba(61,220,151,0.1);}
 
-  .empty-note{color:var(--slate); font-size:13px; font-style:italic; margin-top:8px;}
+  .empty-note{color:var(--slate); font-size:13px; margin-top:8px;}
+  #spotify-embed-holder{position:fixed; top:0; left:0; width:2px; height:2px; overflow:hidden; opacity:0.01; pointer-events:none; z-index:-1;}
 
-  #spotify-embed-holder{
-    position:fixed; top:0; left:0; width:2px; height:2px;
-    overflow:hidden; opacity:0.01; pointer-events:none; z-index:-1;
+  /* Rangliste */
+  .sb-wrap{margin-top:26px;}
+  .scoreboard{display:block;}
+  .score-chip{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 10px; border-top:1px solid var(--line);
+    font-size:14.5px; color:var(--slate);
   }
+  .score-chip .rank{width:22px; color:var(--dim); font-size:13px;}
+  .score-chip .name{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--cream);}
+  .score-chip .pts{font-weight:600; font-size:16px; color:var(--slate); min-width:24px; text-align:right;}
+  .score-chip.lead .rank, .score-chip.lead .pts{color:var(--gold);}
+  .score-chip.active{background:rgba(61,220,151,0.06); box-shadow:inset 2px 0 0 var(--gold);}
+  .score-chip.dim{opacity:0.6;}
+  .score-chip .tag{font-size:11px; font-weight:600; border-radius:999px; padding:2px 8px; background:rgba(61,220,151,0.12); color:var(--gold); white-space:nowrap;}
+  .score-chip .tag.mute{background:rgba(255,255,255,0.07); color:var(--slate);}
 
   .final-list{margin-top:10px;}
   .final-row{
-    display:flex; align-items:center; justify-content:space-between;
-    padding:12px 16px; background:var(--groove); border-radius:10px; margin-bottom:8px;
+    display:flex; align-items:center; gap:12px;
+    padding:12px 14px; background:var(--groove); border:1px solid var(--line);
+    border-radius:14px; margin-bottom:8px;
   }
-  .final-row .rank{font-family:var(--display); font-size:20px; color:var(--gold); width:28px;}
-  .final-row .fname{font-weight:600; flex:1;}
-  .final-row .fpts{font-family:var(--mono); font-size:14px; color:var(--slate);}
-  .final-row.winner{border:1px solid var(--gold); background:rgba(232,180,76,0.08);}
+  .final-row .rank{font-size:18px; font-weight:600; color:var(--dim); width:26px;}
+  .final-row .fname{font-weight:500; flex:1;}
+  .final-row .fpts{font-size:14px; color:var(--slate);}
+  .final-row.winner{border-color:var(--gold); background:rgba(61,220,151,0.08);}
+  .final-row.winner .rank{color:var(--gold);}
+  .final-row.winner .fpts{color:var(--gold);}
 
   a.linkref{color:var(--gold);}
 
-  @media (max-width:420px){
-    .cassette-stage{width:240px; height:190px;}
-    .turntable-glow{width:260px; height:200px;}
-    .cassette-assembly, .cassette{width:240px;}
-    .cassette{height:148px;}
-    .reel{width:30px; height:30px;}
-    .label-line span{font-size:17px;}
-  }
   .gate-overlay{
-    position:fixed; inset:0; z-index:1000;
-    background:var(--ink);
-    display:flex; align-items:center; justify-content:center;
-    padding:24px;
+    position:fixed; inset:0; z-index:1000; background:var(--ink);
+    display:flex; align-items:center; justify-content:center; padding:24px;
   }
   .gate-box{
-    width:100%; max-width:340px;
-    background:var(--panel);
-    border:1px solid rgba(255,255,255,0.06);
-    border-radius:var(--radius);
-    padding:28px 24px;
-    text-align:center;
+    width:100%; max-width:340px; background:var(--panel); border:1px solid var(--line);
+    border-radius:22px; padding:28px 22px; text-align:center;
   }
-  .gate-box h1{
-    font-family:var(--display); font-size:38px; color:var(--cream); margin-bottom:6px; letter-spacing:0.01em;
-  }
-  .gate-box p{color:var(--slate); font-size:13.5px; margin-bottom:20px;}
-  .gate-box input{text-align:center; letter-spacing:0.1em; margin-bottom:10px;}
+  .gate-box h1{font-size:32px; font-weight:700; letter-spacing:-0.035em; color:var(--cream); margin-bottom:6px;}
+  .gate-box p{color:var(--slate); font-size:13.5px; margin-bottom:18px;}
+  .gate-box input{text-align:center; margin-bottom:10px;}
   .gate-error{color:var(--coral); font-size:12.5px; min-height:16px; margin-top:2px;}
 
-  /* ---------- MULTIPLAYER (Firebase) ---------- */
-  .room-code{font-family:var(--display); font-size:64px; letter-spacing:0.18em; color:var(--gold); text-align:center; line-height:1; margin:6px 0 12px; padding-left:0.18em;}
-  .qr-box{background:#fff; border-radius:12px; padding:8px; width:fit-content; margin:0 auto 12px;}
+  /* ---------- Mehrere Handys ---------- */
+  .room-code{font-size:60px; font-weight:700; letter-spacing:0.14em; color:var(--gold); text-align:center; line-height:1; margin:8px 0 14px; padding-left:0.14em;}
+  .qr-box{background:#fff; border-radius:16px; padding:10px; width:fit-content; margin:0 auto 12px;}
   .qr-box svg{display:block; width:176px; height:176px;}
-  .room-link{font-family:var(--mono); font-size:11.5px; color:var(--slate); text-align:center; word-break:break-all; margin-bottom:14px;}
-  .mp-player{display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--groove); border-radius:10px; margin-bottom:6px; font-size:14px;}
-  .mp-player.me{border:1px solid var(--gold);}
+  .room-link{font-size:11.5px; color:var(--slate); text-align:center; word-break:break-all; margin-bottom:14px;}
+  .mp-player{
+    display:flex; align-items:center; gap:10px; padding:10px 12px;
+    background:var(--groove); border:1px solid var(--line); border-radius:12px;
+    margin-bottom:6px; font-size:14px;
+  }
+  .mp-player.me{border-color:var(--gold);}
   .mp-player .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .mp-player .mp-kick{background:rgba(232,80,58,0.15); color:var(--coral); border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:15px; line-height:1;}
+  .mp-player .mp-kick{
+    background:rgba(255,107,107,0.14); color:var(--coral); border:none; border-radius:8px;
+    width:28px; height:28px; min-height:0; padding:0; cursor:pointer; font-size:15px; line-height:1;
+  }
   .mp-msg{min-height:18px; font-size:12.5px; margin-top:8px; color:var(--slate);}
   .mp-msg.err{color:var(--coral);}
   .mp-actions{display:flex; gap:10px; margin-bottom:16px;}
   .mp-actions button{flex:1;}
+
+  @media (max-width:460px){ .row-stack{flex-direction:column; gap:0;} }
+  @media (max-width:420px){
+    body{padding:20px 14px 56px;}
+    .deck-num{font-size:58px;}
+    .room-code{font-size:52px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .eq .bar{animation:none;}
+    .now-meta span, .deck-ticks.bar b{transition:none;}
+  }
 </style>
 </head>
 <body>
@@ -544,10 +351,10 @@
       <label>Jahrzehnt (optional)</label>
       <div class="pick-group" id="decadeChips"></div>
 
-      <div class="row">
+      <div class="row row-stack">
         <div class="field">
-          <label>Anzahl Songs</label>
-          <input type="number" id="deckSizeInput" value="15" min="4" max="50">
+          <label>Anzahl Songs (4–100)</label>
+          <input type="number" id="deckSizeInput" value="15" min="4" max="100">
         </div>
         <div class="field">
           <label>Freitext (überschreibt Auswahl, optional)</label>
@@ -629,7 +436,7 @@
 
     <div class="panel" id="mpHostPanel">
       <h2>4. Mehrere Handys (Beta)</h2>
-      <p class="hint">Jeder spielt mit dem eigenen Handy: Raum erstellen, Code oder QR zeigen, Mitspieler treten bei. Aktuell nur die Lobby — das Raten über die Handys kommt im nächsten Schritt.</p>
+      <p class="hint">Jeder spielt mit dem eigenen Handy: Raum erstellen, Code oder QR zeigen, Mitspieler treten bei und tippen auf ihrem Handy (Modus „Zusammen“). Der Host steuert die Musik und wertet aus.</p>
       <button class="btn-gold" id="mpCreateBtn">Raum erstellen</button>
       <div id="mpRoomBox" style="display:none;">
         <label>Raumcode</label>
@@ -654,60 +461,28 @@
     <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
       <button class="btn-ghost btn-sm" id="cancelGameBtn">← Spiel abbrechen / Einstellungen</button>
     </div>
-    <div class="scoreboard" id="scoreboard"></div>
-
     <div class="panel stage">
-      <div class="deck-progress">
-        <div class="deck-progress-label">
-          <span>SONG <span class="num" id="deckCurrent">1</span> / <span id="deckTotal">10</span></span>
-          <span id="deckRemainingLabel">9 danach übrig</span>
-        </div>
-        <div class="deck-progress-track"><div class="deck-progress-fill" id="deckProgressFill" style="width:0%;"></div></div>
+      <div class="deck-head">
+        <div class="deck-num" id="deckNum"><span id="deckCurrent">01</span></div>
+        <div class="deck-side"><span>von <span id="deckTotal">10</span></span><span class="rest" id="deckRemainingLabel">9 danach übrig</span></div>
       </div>
+      <div class="deck-ticks" id="deckTicks"></div>
 
-      <div class="cassette-stage" id="turntableStage">
-        <div class="turntable-glow"></div>
-        <div class="cassette-assembly" id="cassette" role="button" aria-label="Play/Pause" tabindex="0">
-          <div class="cassette-ground-shadow"></div>
-          <div class="cassette">
-            <div class="cassette-screw tl"></div>
-            <div class="cassette-screw tr"></div>
-            <div class="cassette-screw bl"></div>
-            <div class="cassette-screw br"></div>
-
-            <div class="cassette-label">
-              <div class="label-line" id="labelLine1"><span id="labelTitle"></span></div>
-              <div class="label-line" id="labelLine2"><span id="labelArtist"></span></div>
-              <div class="label-line ghost"></div>
-            </div>
-
-            <div class="cassette-stripe">
-              <div class="cassette-window">
-                <div class="reel-wrap" id="vinyl">
-                  <div class="reel left"><div class="reel-hub"></div></div>
-                  <div class="reel right"><div class="reel-hub"></div></div>
-                  <div class="tape-arc"></div>
-                </div>
-                <div class="tap-hint" id="tapHint">▶</div>
-              </div>
-            </div>
-
-            <div class="cassette-footer">
-              <span class="brand-dot" id="brandDot"></span>
-              <span class="brand-name">plattenteller</span>
-              <span class="tape-type">LN 90</span>
-            </div>
-          </div>
-          <div class="cassette-tray">
-            <div class="tray-slot a"></div>
-            <div class="tray-hole a"></div>
-            <div class="tray-hole b"></div>
-            <div class="tray-slot b"></div>
-          </div>
+      <div class="play-stage" id="turntableStage">
+        <div class="eq" id="vinyl" aria-hidden="true"><span class="bar" style="height:60px;animation-delay:-0.10s"></span><span class="bar" style="height:84px;animation-delay:-0.50s"></span><span class="bar" style="height:44px;animation-delay:-0.90s"></span><span class="bar" style="height:72px;animation-delay:-0.30s"></span><span class="bar" style="height:56px;animation-delay:-0.70s"></span><span class="bar" style="height:84px;animation-delay:-0.20s"></span><span class="bar" style="height:38px;animation-delay:-0.80s"></span><span class="bar" style="height:76px;animation-delay:-0.40s"></span><span class="bar" style="height:64px;animation-delay:-1.00s"></span><span class="bar" style="height:84px;animation-delay:-0.60s"></span><span class="bar" style="height:48px;animation-delay:-0.15s"></span><span class="bar" style="height:70px;animation-delay:-0.75s"></span><span class="bar" style="height:84px;animation-delay:-0.35s"></span><span class="bar" style="height:42px;animation-delay:-0.95s"></span><span class="bar" style="height:66px;animation-delay:-0.25s"></span><span class="bar" style="height:52px;animation-delay:-0.65s"></span><span class="bar" style="height:36px;animation-delay:-0.45s"></span><span class="bar" style="height:74px;animation-delay:-0.05s"></span><span class="bar" style="height:58px;animation-delay:-0.85s"></span><span class="bar" style="height:80px;animation-delay:-0.55s"></span><span class="bar" style="height:46px;animation-delay:-0.20s"></span></div>
+        <div class="play-pill" id="playBtn" role="button" aria-label="Abspielen oder pausieren" tabindex="0">
+          <span class="ico-play"></span>
+          <span class="ico-pause"><i></i><i></i></span>
+          <span class="lbl-play">Abspielen</span><span class="lbl-pause">Pause</span>
         </div>
       </div>
 
-      <div class="now-status" id="nowStatus">Bereit — Kassette antippen</div>
+      <div class="status-row"><span class="brand-dot" id="brandDot"></span><span class="now-status" id="nowStatus">Bereit — Play antippen</span></div>
+      <div class="now-meta">
+        <div class="now-hidden">Titel und Interpret bleiben verdeckt</div>
+        <div id="labelLine1"><span id="labelTitle"></span></div>
+        <div id="labelLine2"><span id="labelArtist"></span></div>
+      </div>
 
       <div class="guess-panel" id="guessPanel">
         <div class="field"><label>Tipp: Titel</label><input type="text" id="guessTitle" placeholder="Songtitel…"></div>
@@ -715,10 +490,10 @@
         <div id="stealBox" style="display:none; margin-bottom:14px;">
           <label style="display:flex; align-items:center; gap:9px; cursor:pointer; text-transform:none; letter-spacing:0; font-family:var(--body); font-size:13px; color:var(--gold);">
             <input type="checkbox" id="stealToggle" style="width:17px; height:17px; accent-color:var(--gold);">
-            🥷 Klau-Bonus einsetzen — bei Treffer −2 Pkt. vom Erstplatzierten (einmalig)
+            Klau-Bonus einsetzen — bei Treffer −2 Pkt. vom Erstplatzierten (einmalig)
           </label>
         </div>
-        <button class="btn-gold btn-block" id="revealBtn">Aufdecken</button>
+        <button class="btn-line btn-block" id="revealBtn">Aufdecken</button>
       </div>
 
       <div class="guess-panel" id="revealPanel" style="display:none;">
@@ -731,7 +506,7 @@
           </div>
         </div>
         <div id="funFactBox" style="display:none; font-family:var(--mono); font-size:12.5px; color:var(--slate); background:var(--groove); border-radius:10px; padding:10px 12px; margin:-6px 0 16px;">
-          💡 <span id="funFactText"></span>
+          <span style="color:var(--gold); font-weight:600;">Fun Fact</span> · <span id="funFactText"></span>
         </div>
         <label>Wer war dran: <span id="revealPlayerName" style="color:var(--gold);"></span> — wie bewerten?</label>
         <div class="judge-grid">
@@ -748,7 +523,7 @@
       <div class="guess-panel" id="togetherGuessPanel" style="display:none;">
         <p class="hint" id="togetherGuessHint" style="margin-bottom:14px;">Jede*r trägt hier seinen Tipp ein (eigenes Handy — Bildschirm den anderen nicht zeigen — oder mündlich/auf Zettel raten und eine Person überträgt es). Danach gemeinsam aufdecken.</p>
         <div id="togetherGuessList"></div>
-        <button class="btn-gold btn-block" id="togetherRevealBtn" style="margin-top:6px;">Aufdecken</button>
+        <button class="btn-line btn-block" id="togetherRevealBtn" style="margin-top:6px;">Aufdecken</button>
       </div>
 
       <div class="guess-panel" id="togetherRevealPanel" style="display:none;">
@@ -761,18 +536,20 @@
           </div>
         </div>
         <div id="togetherFunFactBox" style="display:none; font-family:var(--mono); font-size:12.5px; color:var(--slate); background:var(--groove); border-radius:10px; padding:10px 12px; margin:-6px 0 16px;">
-          💡 <span id="togetherFunFactText"></span>
+          <span style="color:var(--gold); font-weight:600;">Fun Fact</span> · <span id="togetherFunFactText"></span>
         </div>
         <p class="hint" style="margin-bottom:10px;">Jede*r einzeln bewerten:</p>
         <div id="togetherJudgeList"></div>
         <button class="btn-coral btn-block" id="togetherNextRoundBtn" style="margin-top:8px;" disabled>Nächster Song →</button>
       </div>
     </div>
+
+    <div class="sb-wrap"><label>Rangliste</label><div class="scoreboard" id="scoreboard"></div></div>
   </div>
 
   <div id="end-screen" style="display:none;">
     <div class="panel">
-      <h2>Spiel vorbei 🏁</h2>
+      <h2>Spiel vorbei</h2>
       <p class="hint">Der Stapel ist leer. Endstand:</p>
       <div class="final-list" id="finalList"></div>
       <button class="btn-gold btn-block" id="restartBtn" style="margin-top:16px;">Neues Spiel</button>
@@ -807,6 +584,7 @@
   </div>
 
   <div class="panel" id="pvGuessPanel" style="display:none;">
+    <div class="eq eq-sm" id="pvEq" aria-hidden="true"><span class="bar" style="height:37px;animation-delay:-0.10s"></span><span class="bar" style="height:52px;animation-delay:-0.50s"></span><span class="bar" style="height:27px;animation-delay:-0.90s"></span><span class="bar" style="height:44px;animation-delay:-0.30s"></span><span class="bar" style="height:34px;animation-delay:-0.70s"></span><span class="bar" style="height:52px;animation-delay:-0.20s"></span><span class="bar" style="height:23px;animation-delay:-0.80s"></span><span class="bar" style="height:47px;animation-delay:-0.40s"></span><span class="bar" style="height:39px;animation-delay:-1.00s"></span><span class="bar" style="height:52px;animation-delay:-0.60s"></span><span class="bar" style="height:29px;animation-delay:-0.15s"></span><span class="bar" style="height:43px;animation-delay:-0.75s"></span><span class="bar" style="height:52px;animation-delay:-0.35s"></span><span class="bar" style="height:26px;animation-delay:-0.95s"></span><span class="bar" style="height:40px;animation-delay:-0.25s"></span></div>
     <h2>Song <span id="pvRoundNo" style="color:var(--gold);"></span> <span style="color:var(--slate); font-size:0.7em;">von <span id="pvRoundTotal"></span></span></h2>
     <p class="hint" id="pvGuessHint">Warte, bis der Host den Song startet …</p>
     <div class="field"><label>Songtitel</label><input type="text" id="pvGuessTitle" maxlength="80" autocomplete="off" autocorrect="off" placeholder="Titel…"></div>
@@ -859,7 +637,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-10.7';
+  const APP_VERSION = '2026-10-11.1';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -926,7 +704,7 @@
   window.onSpotifyIframeApiReady = (IFrameAPI) => { spotifyIFrameAPI = IFrameAPI; };
 
   // Wird der Controller nicht rechtzeitig bereit (iFrame-API lädt nicht, Netz hängt),
-  // bekommt man statt ewig "Bereit — Kassette antippen" einen Hinweis angezeigt.
+  // bekommt man statt ewig "Bereit — Play antippen" einen Hinweis angezeigt.
   const CONTROLLER_TIMEOUT_MS = 12000;
   let controllerTimer = null;
   let pendingUri = null; // zuletzt angeforderter Song, solange noch kein Controller existiert
@@ -955,7 +733,7 @@
         if(controllerReady) return; // guard: 'ready' can fire again later, only act on the first time
         controllerReady = true;
         clearTimeout(controllerTimer);
-        if(!isPlaying) nowStatus.textContent = 'Bereit — Kassette antippen'; // evtl. angezeigten Timeout-Hinweis zurücknehmen
+        if(!isPlaying) nowStatus.textContent = 'Bereit — Play antippen'; // evtl. angezeigten Timeout-Hinweis zurücknehmen
         console.log('Spotify embed controller ready');
         cb && cb();
       });
@@ -1369,7 +1147,7 @@
 
     fetchStatus.textContent = 'Suche Songs…';
     try{
-      const desired = Math.max(4, Math.min(50, parseInt(deckSizeInput.value) || 15));
+      const desired = Math.max(4, Math.min(100, parseInt(deckSizeInput.value) || 15));
       const maxPerArtist = 2;
       const perGenreTarget = Math.ceil(desired / genreBuckets.length);
       const collected = [];
@@ -1381,7 +1159,7 @@
         const perCall = 10; // Spotify's search endpoint only allows limit 0-10
         const batchSize = 3; // so viele Such-Calls parallel — klein genug, um Spotifys Rate-Limit nicht zu reizen
         const maxOffset = 300; // stay within reasonably relevant/known territory — deeper offsets surface very obscure results
-        const totalMaxCalls = 30;
+        const totalMaxCalls = desired > 50 ? 60 : 30; // mehr Songs = mehr Such-Calls
         const callsPerGenre = Math.max(3, Math.floor(totalMaxCalls / genreBuckets.length));
         const popHighThreshold = 30; // "bekannte" Songs
         const popLowThreshold = 10;  // "Geheimtipps" — darunter meist zu obskur
@@ -1598,7 +1376,7 @@
   }
 
   function sampleFromImportedPool(){
-    const desired = Math.max(4, Math.min(50, parseInt(deckSizeInput.value) || 15));
+    const desired = Math.max(4, Math.min(100, parseInt(deckSizeInput.value) || 15));
     const maxPerArtist = 2;
     const picked = pickWithArtistCap(importedPlaylistPool, desired, maxPerArtist);
     tracks = picked;
@@ -1798,10 +1576,26 @@
 
   function updateDeckProgress(){
     const songNumber = totalDeckSize - deck.length;
-    deckCurrentEl.textContent = songNumber;
+    const digits = String(totalDeckSize).length;
+    deckCurrentEl.textContent = String(songNumber).padStart(Math.max(2, digits), '0');
+    deckNumEl.classList.toggle('d3', digits >= 3);
     deckTotalEl.textContent = totalDeckSize;
     deckRemainingLabel.textContent = deck.length === 0 ? 'letzter Song' : deck.length + ' danach übrig';
-    deckProgressFill.style.width = Math.round((songNumber / totalDeckSize) * 100) + '%';
+    const ticks = document.getElementById('deckTicks');
+    if(totalDeckSize <= 24){
+      // ein Strich pro Song
+      ticks.className = 'deck-ticks';
+      ticks.innerHTML = Array.from({ length: totalDeckSize }, (_, i) => '<i' + (i < songNumber ? ' class="on"' : '') + '></i>').join('');
+    }else{
+      // viele Songs: durchgehender Balken (sonst werden die Striche zu winzig)
+      const pct = Math.round((songNumber / totalDeckSize) * 100) + '%';
+      if(ticks.className !== 'deck-ticks bar' || !ticks.firstChild){
+        ticks.className = 'deck-ticks bar';
+        ticks.innerHTML = '<b style="width:0%"></b>';
+        void ticks.offsetWidth;
+      }
+      ticks.firstChild.style.width = pct;
+    }
   }
 
   // Abgleich der Spieler im Spiel mit dem Raum (läuft bei jeder Änderung in Firebase):
@@ -1929,12 +1723,12 @@
   const deckCurrentEl = document.getElementById('deckCurrent');
   const deckTotalEl = document.getElementById('deckTotal');
   const deckRemainingLabel = document.getElementById('deckRemainingLabel');
-  const deckProgressFill = document.getElementById('deckProgressFill');
+  const deckNumEl = document.getElementById('deckNum');
   const turntableStage = document.getElementById('turntableStage');
   const vinyl = document.getElementById('vinyl');
   const labelTitle = document.getElementById('labelTitle');
   const labelArtist = document.getElementById('labelArtist');
-  const cassetteEl = document.getElementById('cassette');
+  const cassetteEl = document.getElementById('playBtn'); // großer Play/Pause-Knopf
   const brandDot = document.getElementById('brandDot');
   const nowStatus = document.getElementById('nowStatus');
   const guessPanel = document.getElementById('guessPanel');
@@ -2023,27 +1817,26 @@
 
   function renderScoreboard(){
     scoreboard.innerHTML = '';
-    const visible = players.filter(p => !p.removed);
-    const maxScore = Math.max(0, ...visible.map(p => p.score));
-    visible.forEach((p,i) => {
-      const isLeader = p.score > 0 && p.score === maxScore;
-      const isActive = gameMode === 'sequential' && i === currentPlayerIdx;
-      const chip = document.createElement('div');
-      chip.className = 'score-chip' + (isActive ? ' active' : '');
+    const visible = players.map((p, idx) => ({ p: p, idx: idx })).filter(x => !x.p.removed);
+    const maxScore = Math.max(0, ...visible.map(x => x.p.score));
+    const sorted = visible.slice().sort((a, b) => b.p.score - a.p.score);
+    sorted.forEach(x => {
+      const p = x.p;
+      const rank = 1 + visible.filter(o => o.p.score > p.score).length;
+      const isLead = p.score > 0 && p.score === maxScore;
+      const isActive = gameMode === 'sequential' && x.idx === currentPlayerIdx;
       const statusTxt = p.left ? 'ausgestiegen' : ((remoteGame && p.connected === false) ? 'offline' : '');
-      if(statusTxt) chip.style.opacity = '0.6';
-      const streakTag = (p.streak && p.streak >= 2) ? ` <span title="Streak">🔥${p.streak}</span>` : (statusTxt ? '<span style="color:var(--slate);">' + statusTxt + '</span>' : '');
-      chip.innerHTML = `
-        <div class="turn-badge" style="${isActive ? '' : 'visibility:hidden;'}">Am Zug</div>
-        <div class="name">${escapeHtml(p.name)}${isLeader ? ' <span class="crown">👑</span>' : ''}</div>
-        <div class="pts">${p.score}</div>
-        <div style="font-family:var(--mono); font-size:11px; color:var(--gold); min-height:14px;">${streakTag}</div>
-      `;
-      scoreboard.appendChild(chip);
+      const row = document.createElement('div');
+      row.className = 'score-chip' + (isActive ? ' active' : '') + (isLead ? ' lead' : '') + (statusTxt ? ' dim' : '');
+      const tags = [];
+      if(isActive) tags.push('<span class="tag">Am Zug</span>');
+      if(p.streak && p.streak >= 2) tags.push('<span class="tag" title="Streak">Streak ' + p.streak + '</span>');
+      if(statusTxt) tags.push('<span class="tag mute">' + statusTxt + '</span>');
+      row.innerHTML = '<span class="rank">' + (maxScore > 0 ? rank : '–') + '</span><span class="name">' + escapeHtml(p.name) + '</span>' + tags.join('') + '<span class="pts">' + p.score + '</span>';
+      scoreboard.appendChild(row);
     });
   }
 
-  // resume=true: denselben Song nach einem Neuladen erneut anzeigen (nichts vom Stapel nehmen, Runde in Firebase nicht anfassen)
   function loadNextTrack(resume){
     if(!resume){
       if(deck.length === 0){ showEndScreen(); return; }
@@ -2061,7 +1854,7 @@
     turntableStage.classList.remove('playing');
     isPlaying = false;
     brandDot.classList.remove('is-playing');
-    nowStatus.textContent = 'Bereit — Kassette antippen';
+    nowStatus.textContent = 'Bereit — Play antippen';
 
     if(gameMode === 'together'){
       guessPanel.style.display = 'none';
@@ -2260,9 +2053,9 @@
       player.score += total;
 
       const parts = [`Basis +${basePts}`];
-      if(streakBonus > 0) parts.push(`Streak 🔥${player.streak} +${streakBonus}`);
-      if(stealAmount > 0) parts.push(`🥷 geklaut von ${stolenFrom} +${stealAmount}`);
-      if(justUnlockedSteal) parts.push('🥷 Steal freigeschaltet für die nächste Chance!');
+      if(streakBonus > 0) parts.push(`Streak ${player.streak} +${streakBonus}`);
+      if(stealAmount > 0) parts.push(`geklaut von ${stolenFrom} +${stealAmount}`);
+      if(justUnlockedSteal) parts.push('Klau-Bonus freigeschaltet für die nächste Chance!');
       roundBonusNote.textContent = total > 0 ? parts.join(' · ') + ` = ${total} Pkt.` : 'Keine Punkte diese Runde.';
 
       renderScoreboard();
@@ -2330,7 +2123,7 @@
       row.className = 'field';
       row.innerHTML = `
         <label style="color:var(--gold);">${escapeHtml(p.name)}</label>
-        <div class="row">
+        <div class="stack">
           <input type="text" class="together-guess-title" data-idx="${i}" placeholder="Songtitel…">
           <input type="text" class="together-guess-artist" data-idx="${i}" placeholder="Interpret…">
         </div>
@@ -2372,7 +2165,7 @@
     renderTogetherJudgeList(t);
   };
 
-  // Auflösung anzeigen (Cover, Titel, Fun Fact, Etikett auf der Kassette)
+  // Auflösung anzeigen (Cover, Titel, Fun Fact, Titel/Interpret unter dem Play-Knopf)
   function showTogetherReveal(t){
     togetherGuessPanel.style.display = 'none';
     togetherRevealPanel.style.display = 'block';
@@ -2508,7 +2301,7 @@
       row.className = 'final-row' + (i===0 ? ' winner' : '');
       row.innerHTML = `
         <div class="rank">${i+1}</div>
-        <div class="fname">${escapeHtml(p.name)}${i===0 ? ' 👑' : ''}${p.left ? ' <span style="color:var(--slate); font-size:0.75em;">(ausgestiegen)</span>' : ''}</div>
+        <div class="fname">${escapeHtml(p.name)}${p.left ? ' <span style="color:var(--slate); font-size:0.75em;">(ausgestiegen)</span>' : ''}</div>
         <div class="fpts">${p.score} Pkt.</div>
       `;
       finalList.appendChild(row);
@@ -2988,6 +2781,7 @@
   // Zustand der Handy-Ansicht (wird von den Firebase-Listenern gefüllt, pvRender() zeichnet daraus)
   let pvMeta = null, pvRound = null, pvResult = null, pvPlayers = [], pvLastN, pvGuessRec = null, pvSending = false, pvGuessErr = '';
   const pvGuessHint = $('pvGuessHint');
+  const pvEq = $('pvEq');
 
   // 12,3 s  /  1:05 min
   function fmtDur(ms){
@@ -3038,6 +2832,7 @@
       pvMyScoreGuess.textContent = myScore;
       const rec = (pvGuessRec && pvGuessRec.round === pvRound.n) ? pvGuessRec : null;
       const started = !!pvRound.startedAt;
+      pvEq.classList.toggle('spin', started); // Equalizer tanzt, sobald der Host den Song gestartet hat
       if(rec){
         // Tipp ist abgegeben und endgültig
         pvGuessTitle.value = rec.title || ''; pvGuessArtist.value = rec.artist || '';
@@ -3064,7 +2859,7 @@
       pvRevealArtist.textContent = rv.artist || '';
       if(rv.cover){ pvRevealCover.src = rv.cover; pvRevealCover.style.display = 'block'; pvRevealCoverPlaceholder.style.display = 'none'; }
       else { pvRevealCover.style.display = 'none'; pvRevealCoverPlaceholder.style.display = 'flex'; }
-      if(rv.funFact){ pvRevealFun.textContent = '💡 ' + rv.funFact; pvRevealFun.style.display = 'block'; } else { pvRevealFun.style.display = 'none'; }
+      if(rv.funFact){ pvRevealFun.textContent = 'Fun Fact · ' + rv.funFact; pvRevealFun.style.display = 'block'; } else { pvRevealFun.style.display = 'none'; }
       const res = (pvResult && pvRound && pvResult.round === pvRound.n) ? pvResult : null;
       const myRec = (pvGuessRec && pvGuessRec.round === pvRound.n) ? pvGuessRec : null;
       const myTime = (myRec && myRec.at && pvRound.startedAt) ? ' (nach ' + fmtDur(myRec.at - pvRound.startedAt) + ')' : '';
