@@ -646,6 +646,7 @@
       <div class="mp-msg" id="mpHostMsg"></div>
     </div>
 
+    <p class="hint" id="remoteStartHint" style="display:none; margin-bottom:10px;"></p>
     <button class="btn-coral btn-block" id="startGameBtn" style="padding:15px; font-size:15px;" disabled>Spiel starten</button>
   </div>
 
@@ -743,8 +744,9 @@
         <button class="btn-coral btn-block" id="nextRoundBtn" style="margin-top:14px;">Nächster Song →</button>
       </div>
 
+      <div class="mp-msg err" id="mpSyncMsg"></div>
       <div class="guess-panel" id="togetherGuessPanel" style="display:none;">
-        <p class="hint" style="margin-bottom:14px;">Jede*r trägt hier seinen Tipp ein (eigenes Handy — Bildschirm den anderen nicht zeigen — oder mündlich/auf Zettel raten und eine Person überträgt es). Danach gemeinsam aufdecken.</p>
+        <p class="hint" id="togetherGuessHint" style="margin-bottom:14px;">Jede*r trägt hier seinen Tipp ein (eigenes Handy — Bildschirm den anderen nicht zeigen — oder mündlich/auf Zettel raten und eine Person überträgt es). Danach gemeinsam aufdecken.</p>
         <div id="togetherGuessList"></div>
         <button class="btn-gold btn-block" id="togetherRevealBtn" style="margin-top:6px;">Aufdecken</button>
       </div>
@@ -802,6 +804,38 @@
     <div id="pvPlayerList"></div>
     <button class="btn-ghost btn-block" id="pvLeaveBtn" style="margin-top:12px;">Raum verlassen</button>
   </div>
+
+  <div class="panel" id="pvGuessPanel" style="display:none;">
+    <h2>Song <span id="pvRoundNo" style="color:var(--gold);"></span> <span style="color:var(--slate); font-size:0.7em;">von <span id="pvRoundTotal"></span></span></h2>
+    <p class="hint">Hör zu und tippe, was du erkennst. Dein Tipp wird automatisch gesendet.</p>
+    <div class="field"><label>Songtitel</label><input type="text" id="pvGuessTitle" maxlength="80" autocomplete="off" autocorrect="off" placeholder="Titel…"></div>
+    <div class="field"><label>Interpret</label><input type="text" id="pvGuessArtist" maxlength="80" autocomplete="off" autocorrect="off" placeholder="Interpret…"></div>
+    <button class="btn-gold btn-block" id="pvGuessBtn">Abschicken</button>
+    <div class="mp-msg" id="pvGuessMsg"></div>
+    <div style="font-family:var(--mono); font-size:12px; color:var(--slate); margin-top:10px;">Dein Punktestand: <span id="pvMyScoreGuess" style="color:var(--gold);">0</span></div>
+  </div>
+
+  <div class="panel" id="pvRevealPanel" style="display:none;">
+    <div class="reveal-card">
+      <img id="pvRevealCover" src="" alt="" style="display:none;">
+      <div id="pvRevealCoverPlaceholder" class="placeholder-cover" style="width:64px;height:64px;">♪</div>
+      <div>
+        <div class="rt" id="pvRevealTitle"></div>
+        <div class="ra" id="pvRevealArtist"></div>
+      </div>
+    </div>
+    <div id="pvRevealFun" style="display:none; font-family:var(--mono); font-size:12.5px; color:var(--slate); background:var(--groove); border-radius:10px; padding:10px 12px; margin:-6px 0 14px;"></div>
+    <div id="pvMyResult" style="font-family:var(--mono); font-size:13px; margin-bottom:14px;"></div>
+    <label>Punktestand</label>
+    <div id="pvScoreList"></div>
+    <p class="hint" style="margin:10px 0 0;">Warte auf den nächsten Song…</p>
+  </div>
+
+  <div class="panel" id="pvFinalPanel" style="display:none;">
+    <h2>Spiel vorbei!</h2>
+    <div id="pvFinalList"></div>
+    <p class="hint" style="margin:10px 0 0;">Der Host kann eine neue Runde starten — du bleibst im Raum.</p>
+  </div>
 </div>
 
 <script>
@@ -821,7 +855,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-10.1';
+  const APP_VERSION = '2026-10-10.2';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -1696,14 +1730,39 @@
   addPlayerBtn.onclick = addPlayer;
   playerInput.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); addPlayer(); }});
 
-  function checkStart(){ startGameBtn.disabled = !(players.length >= 1 && tracks.length >= 1); }
+  function checkStart(){
+    const mp = MP();
+    const remoteCount = mp ? mp.getRoomPlayers().length : 0;
+    startGameBtn.disabled = !((players.length >= 1 || remoteCount >= 1) && tracks.length >= 1);
+    const hint = document.getElementById('remoteStartHint');
+    if(remoteCount >= 1){
+      hint.style.display = 'block';
+      hint.textContent = 'Das Spiel startet mit den ' + remoteCount + ' Handy-Spielern aus dem Raum (Modus „Zusammen“). Spieler aus der lokalen Liste oben werden dabei nicht verwendet.';
+    }else{
+      hint.style.display = 'none';
+    }
+  }
+  window.PTGameHooks = { recheckStart: checkStart };
 
   // ---------- MODE (Reihenfolge vs. Zusammen) ----------
   let gameMode = 'sequential'; // 'sequential' | 'together'
+  let chosenMode = 'sequential'; // was im Setup gewählt wurde (gameMode wird bei Handy-Spielen auf 'together' gezwungen)
+  // Handy-Spiel (Firebase-Raum): Spieler kommen aus dem Raum statt aus der lokalen Liste.
+  let remoteGame = false;
+  let localPlayersBackup = null;
+  let remoteRound = 0;
+  let unsubGuesses = null;
+  const mpSyncMsg = document.getElementById('mpSyncMsg');
+  function syncError(e){
+    console.error(e);
+    mpSyncMsg.textContent = 'Handy-Sync: ' + ((e && e.message) || e) + ' — Spiel läuft lokal weiter.';
+  }
+  function MP(){ return (window.PTMP && window.PTMP.active()) ? window.PTMP : null; } // function-Deklaration: wird von checkStart() schon früh genutzt
   const modeChipsEl = document.getElementById('modeChips');
   [...modeChipsEl.children].forEach(chip => {
     chip.onclick = () => {
       gameMode = chip.getAttribute('data-mode');
+      chosenMode = gameMode;
       [...modeChipsEl.children].forEach(c => c.classList.toggle('selected', c === chip));
     };
   });
@@ -1786,6 +1845,16 @@
   });
 
   startGameBtn.onclick = () => {
+    mpSyncMsg.textContent = '';
+    const mp = MP();
+    remoteGame = !!(mp && mp.getRoomPlayers().length >= 1);
+    if(remoteGame){
+      localPlayersBackup = players;
+      players = mp.getRoomPlayers().map(rp => ({ name: rp.name, uid: rp.uid, score: 0, streak: 0, stealAvailable: false, stealUsed: false }));
+      gameMode = 'together';
+      remoteRound = 0;
+      mp.onGameStart(players.map(p => p.uid)).catch(syncError);
+    }
     deck = shuffle(tracks.map((_,i)=>i));
     totalDeckSize = deck.length;
     currentPlayerIdx = 0;
@@ -1842,6 +1911,13 @@
       stealBox.style.display = 'none';
       togetherGuesses = [];
       togetherJudgedCount = 0;
+      if(remoteGame && MP()){
+        remoteRound = songNumber;
+        togetherRevealBtn.disabled = true; // erst nach dem Sync der neuen Runde freigeben
+        MP().onRound(songNumber, totalDeckSize).then(() => { togetherRevealBtn.disabled = false; }).catch(e => { togetherRevealBtn.disabled = false; syncError(e); });
+      }else{
+        togetherRevealBtn.disabled = false;
+      }
       renderTogetherGuessPanel();
       togetherGuessPanel.style.display = 'block';
       togetherRevealPanel.style.display = 'none';
@@ -2022,7 +2098,26 @@
   };
 
   // ---------- ZUSAMMEN-MODUS: alle raten parallel, jede*r wird einzeln bewertet ----------
+  function renderRemoteGuessStatus(map){
+    const done = players.filter(p => map && map[p.uid]).length;
+    togetherGuessList.innerHTML =
+      '<div class="hint" style="margin-bottom:8px;">' + done + ' von ' + players.length + ' haben getippt</div>' +
+      players.map(p => {
+        const sent = !!(map && map[p.uid]);
+        return '<div class="mp-player"><span class="dot' + (sent ? ' ok' : '') + '"></span><span class="nm">' + escapeHtml(p.name) + '</span><span style="font-family:var(--mono); font-size:11.5px; color:var(--slate);">' + (sent ? '✓ getippt' : 'tippt …') + '</span></div>';
+      }).join('');
+  }
+
   function renderTogetherGuessPanel(){
+    const hintEl = document.getElementById('togetherGuessHint');
+    if(unsubGuesses){ unsubGuesses(); unsubGuesses = null; }
+    if(remoteGame){
+      hintEl.textContent = 'Alle tippen auf dem eigenen Handy. Wenn genug getippt haben, hier aufdecken.';
+      renderRemoteGuessStatus({});
+      unsubGuesses = MP() ? MP().onGuessesChange(renderRemoteGuessStatus) : null;
+      return;
+    }
+    hintEl.textContent = 'Jede*r trägt hier seinen Tipp ein (eigenes Handy — Bildschirm den anderen nicht zeigen — oder mündlich/auf Zettel raten und eine Person überträgt es). Danach gemeinsam aufdecken.';
     togetherGuessList.innerHTML = '';
     players.forEach((p, i) => {
       const row = document.createElement('div');
@@ -2038,15 +2133,29 @@
     });
   }
 
-  togetherRevealBtn.onclick = () => {
+  togetherRevealBtn.onclick = async () => {
     const t = tracks[currentTrackId];
     if(t && t.source === 'deezer'){ deezerAudio.pause(); } else if(controller){ controller.pause(); }
 
-    togetherGuesses = players.map((p, i) => {
-      const titleEl = togetherGuessList.querySelector('.together-guess-title[data-idx="' + i + '"]');
-      const artistEl = togetherGuessList.querySelector('.together-guess-artist[data-idx="' + i + '"]');
-      return { title: titleEl ? titleEl.value : '', artist: artistEl ? artistEl.value : '' };
-    });
+    if(remoteGame && MP()){
+      // Erst sperren + Lösung veröffentlichen, dann die (nun endgültigen) Tipps lesen.
+      togetherRevealBtn.disabled = true;
+      try{
+        if(unsubGuesses){ unsubGuesses(); unsubGuesses = null; }
+        const map = await MP().reveal({ title: t.title, artist: t.artist, cover: t.cover || '', funFact: t.funFact || '' });
+        togetherGuesses = players.map(p => map[p.uid] || { title: '', artist: '' });
+      }catch(e){
+        syncError(e);
+        togetherGuesses = players.map(() => ({ title: '', artist: '' }));
+      }
+      togetherRevealBtn.disabled = false;
+    }else{
+      togetherGuesses = players.map((p, i) => {
+        const titleEl = togetherGuessList.querySelector('.together-guess-title[data-idx="' + i + '"]');
+        const artistEl = togetherGuessList.querySelector('.together-guess-artist[data-idx="' + i + '"]');
+        return { title: titleEl ? titleEl.value : '', artist: artistEl ? artistEl.value : '' };
+      });
+    }
 
     togetherGuessPanel.style.display = 'none';
     togetherRevealPanel.style.display = 'block';
@@ -2093,8 +2202,12 @@
       wrap.className = 'panel';
       wrap.style.padding = '14px';
       wrap.style.marginBottom = '10px';
+      const hasGuess = !!((guess.title || '').trim() || (guess.artist || '').trim());
       wrap.innerHTML = `
-        <label style="color:var(--gold); margin-bottom:8px; display:block;">${escapeHtml(p.name)}</label>
+        <label style="color:var(--gold); margin-bottom:6px; display:block;">${escapeHtml(p.name)}</label>
+        <div style="font-family:var(--mono); font-size:12.5px; color:var(--slate); margin-bottom:10px;">${hasGuess
+          ? 'Tipp: ' + escapeHtml((guess.title || '—') + ' / ' + (guess.artist || '—'))
+          : 'Kein Tipp abgegeben'}</div>
         <div class="judge-grid">
           <button class="btn-ghost" data-score="2">Beides richtig (+2)</button>
           <button class="btn-ghost" data-score="1a">Nur Titel (+1)</button>
@@ -2103,12 +2216,13 @@
         </div>
       `;
       const rowButtons = [...wrap.querySelectorAll('.judge-grid button[data-score]')];
-      const bothBtn = wrap.querySelector('[data-score="2"]');
-      // Grobe Trefferanzeige wie im Reihenfolge-Modus: markiert die Beides-richtig-Option vorab,
-      // wenn Eintrag und echter Titel/Interpret sich (nach Normalisierung) überschneiden.
-      bothBtn.style.borderColor =
-        (guessedTitle && realTitle.includes(guessedTitle)) && (guessedArtist && realArtist.includes(guessedArtist))
-          ? 'var(--gold)' : 'rgba(255,255,255,0.15)';
+      // Treffer-Vorschlag: markiert die passende Bewertung vorab (Titel/Interpret getrennt geprüft).
+      const titleOk = guessedTitle.length >= 3 && realTitle.includes(guessedTitle);
+      const artistOk = guessedArtist.length >= 3 && realArtist.includes(guessedArtist);
+      const suggested = titleOk && artistOk ? '2' : titleOk ? '1a' : artistOk ? '1b' : (hasGuess ? '0' : null);
+      rowButtons.forEach(b => {
+        b.style.borderColor = (suggested !== null && b.getAttribute('data-score') === suggested) ? 'var(--gold)' : 'rgba(255,255,255,0.15)';
+      });
 
       let rowJudged = false;
       rowButtons.forEach(btn => {
@@ -2121,6 +2235,7 @@
           let pts = 0;
           if(val === '2') pts = 2; else if(val === '1a' || val === '1b') pts = 1;
           p.score += pts;
+          if(remoteGame && MP() && p.uid) MP().onJudged(p.uid, pts, p.score, remoteRound).catch(syncError);
           renderScoreboard();
           togetherJudgedCount++;
           togetherNextRoundBtn.disabled = togetherJudgedCount < players.length;
@@ -2137,6 +2252,8 @@
 
   function showEndScreen(){
     releaseWakeLock();
+    if(unsubGuesses){ unsubGuesses(); unsubGuesses = null; }
+    if(remoteGame && MP()) MP().onGameEnd().catch(syncError);
     gameScreen.style.display = 'none';
     endScreen.style.display = 'block';
     const finalList = document.getElementById('finalList');
@@ -2154,8 +2271,23 @@
     });
   }
 
+  // Nach einem Handy-Spiel: lokale Spielerliste zurück, Raum zurück in die Lobby.
+  function leaveRemoteGame(){
+    if(unsubGuesses){ unsubGuesses(); unsubGuesses = null; }
+    if(remoteGame){
+      if(MP()) MP().onGameReset().catch(syncError);
+      if(localPlayersBackup) players = localPlayersBackup;
+      localPlayersBackup = null;
+      remoteGame = false;
+      gameMode = chosenMode;
+      renderPlayers();
+    }
+    checkStart();
+  }
+
   document.getElementById('restartBtn').onclick = () => {
     players.forEach(p => { p.score = 0; p.streak = 0; p.stealAvailable = false; p.stealUsed = false; });
+    leaveRemoteGame();
     endScreen.style.display = 'none';
     setupScreen.style.display = 'block';
   };
@@ -2166,6 +2298,7 @@
     deezerAudio.pause();
     releaseWakeLock();
     players.forEach(p => { p.score = 0; p.streak = 0; p.stealAvailable = false; p.stealUsed = false; });
+    leaveRemoteGame();
     gameScreen.style.display = 'none';
     endScreen.style.display = 'none';
     setupScreen.style.display = 'block';
@@ -2179,7 +2312,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script>
 (function(){
-  // ---------- MULTIPLAYER (Firebase Realtime Database) — Phase 2: Lobby ----------
+  // ---------- MULTIPLAYER (Firebase Realtime Database) — Phase 2: Lobby, Phase 3: Raten übers Handy ----------
   // Host erstellt einen Raum, Spieler treten per Link/QR/Code mit dem eigenen Handy bei.
   // Die Web-Config von Firebase ist NICHT geheim (wie die Spotify Client ID) — der Schutz
   // läuft über die Security Rules in der Firebase Console, siehe docs/firebase-multiplayer-plan.md.
@@ -2273,7 +2406,7 @@
     const out = [];
     snap.forEach(ch => {
       const v = ch.val() || {};
-      if(v.name) out.push({ uid: ch.key, name: v.name, connected: !!v.connected, joinedAt: v.joinedAt || 0 });
+      if(v.name) out.push({ uid: ch.key, name: v.name, connected: !!v.connected, joinedAt: v.joinedAt || 0, score: v.score || 0 });
     });
     out.sort((a, b) => a.joinedAt - b.joinedAt);
     return out;
@@ -2291,6 +2424,7 @@
   const mpCount = $('mpCount'), mpPlayerList = $('mpPlayerList'), mpHostMsg = $('mpHostMsg');
 
   let hostCode = null, hostPlayersRef = null, hostPlayersCb = null, hostInfoRef = null, hostInfoCb = null;
+  let hostPlayers = []; // aktuelle Spieler im Raum (für den Spielstart)
 
   function hostMsg(text, isErr){ mpHostMsg.textContent = text || ''; mpHostMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
 
@@ -2308,6 +2442,8 @@
     if(hostPlayersRef && hostPlayersCb) hostPlayersRef.off('value', hostPlayersCb);
     if(hostInfoRef && hostInfoCb) hostInfoRef.off('value', hostInfoCb);
     hostPlayersRef = hostPlayersCb = hostInfoRef = hostInfoCb = null;
+    hostPlayers = [];
+    if(window.PTGameHooks) window.PTGameHooks.recheckStart();
   }
 
   function attachHostRoom(code){
@@ -2319,6 +2455,8 @@
     hostPlayersRef = db.ref('rooms/' + code + '/players');
     hostPlayersCb = hostPlayersRef.on('value', snap => {
       const list = playersFromSnap(snap);
+      hostPlayers = list;
+      if(window.PTGameHooks) window.PTGameHooks.recheckStart();
       mpCount.textContent = list.length;
       mpPlayerList.innerHTML = list.length
         ? list.map(p => '<div class="mp-player">' + dot(p.connected) + '<span class="nm">' + esc(p.name) + '</span><button class="mp-kick" data-uid="' + esc(p.uid) + '" title="Entfernen">×</button></div>').join('')
@@ -2371,7 +2509,14 @@
       const myUid = await ensureAuth();
       const s = await db.ref('rooms/' + code + '/meta').once('value');
       const m = s.val();
-      if(m && m.hostUid === myUid && m.phase !== 'ended') attachHostRoom(code);
+      if(m && m.hostUid === myUid && m.phase !== 'ended'){
+        if(m.phase !== 'lobby'){
+          // Das laufende Spiel lebte nur im Speicher dieser Seite — Raum zurück in die Lobby, damit die Handys nicht hängen.
+          await Promise.all([db.ref('rooms/' + code + '/round').remove(), db.ref('rooms/' + code + '/results').remove(), db.ref('rooms/' + code + '/guesses').remove()]);
+          await db.ref('rooms/' + code + '/meta/phase').set('lobby');
+        }
+        attachHostRoom(code);
+      }
       else { try{ localStorage.removeItem(HOST_ROOM_KEY); }catch(e){} }
     }catch(e){ console.warn('Raum konnte nicht wiederhergestellt werden', e); }
   }
@@ -2410,20 +2555,161 @@
   });
 
   // =====================================================================
+  // BRÜCKE ZUM SPIEL (Host): wird vom Hauptskript aufgerufen
+  // =====================================================================
+  const roomRef = path => db.ref('rooms/' + hostCode + '/' + path);
+  const snapToMap = snap => { const m = {}; snap.forEach(ch => { m[ch.key] = ch.val(); }); return m; };
+
+  window.PTMP = {
+    active: () => !!hostCode,
+    getRoomPlayers: () => hostPlayers.slice(),
+
+    // Spiel startet: alles zurücksetzen, Phase auf "playing"
+    onGameStart: async function(uids){
+      await Promise.all([roomRef('guesses').remove(), roomRef('results').remove(), roomRef('round').remove()]);
+      await Promise.all(uids.map(u => roomRef('players/' + u + '/score').set(0)));
+      await roomRef('meta/mode').set('together');
+      await roomRef('meta/phase').set('playing');
+    },
+
+    // Neue Runde: alte Tipps/Ergebnisse weg, Handys zeigen das Tippfeld.
+    // Titel/Interpret des Songs stehen NICHT in der Datenbank, bis aufgedeckt wird.
+    onRound: async function(n, total){
+      await Promise.all([roomRef('guesses').remove(), roomRef('results').remove()]);
+      await roomRef('round').set({ n: n, total: total, state: 'guessing' });
+    },
+
+    // Live-Stand, wer schon getippt hat (nur der Host darf alle Tipps lesen)
+    onGuessesChange: function(cb){
+      const ref = roomRef('guesses');
+      const fn = ref.on('value', snap => cb(snapToMap(snap)));
+      return () => ref.off('value', fn);
+    },
+
+    // Aufdecken: Lösung veröffentlichen, Runde sperren (keine Tipps mehr), dann die endgültigen Tipps lesen
+    reveal: async function(r){
+      await roomRef('round/reveal').set(r);
+      await roomRef('round/state').set('reveal');
+      const snap = await roomRef('guesses').once('value');
+      return snapToMap(snap);
+    },
+
+    // Bewertung eines Spielers: neuer Gesamtstand + Ergebnis dieser Runde
+    onJudged: async function(uid, pts, total, round){
+      await Promise.all([roomRef('players/' + uid + '/score').set(total), roomRef('results/' + uid).set({ pts: pts, round: round })]);
+    },
+
+    onGameEnd: async function(){ await roomRef('meta/phase').set('finished'); },
+
+    // Neues Spiel / Abbruch: Raum zurück in die Lobby, Punkte auf 0
+    onGameReset: async function(){
+      await Promise.all([roomRef('guesses').remove(), roomRef('results').remove(), roomRef('round').remove()]);
+      await Promise.all(hostPlayers.map(p => roomRef('players/' + p.uid + '/score').set(0)));
+      await roomRef('meta/phase').set('lobby');
+    }
+  };
+
+  // =====================================================================
   // SPIELER (Beitritts-Link ?join=CODE)
   // =====================================================================
   const pvView = $('playerView'), pvJoinPanel = $('pvJoinPanel'), pvLobbyPanel = $('pvLobbyPanel');
   const pvRoomCode = $('pvRoomCode'), pvNameInput = $('pvNameInput'), pvJoinBtn = $('pvJoinBtn'), pvJoinMsg = $('pvJoinMsg');
   const pvMyName = $('pvMyName'), pvLobbyHint = $('pvLobbyHint'), pvCount = $('pvCount'), pvPlayerList = $('pvPlayerList'), pvLeaveBtn = $('pvLeaveBtn');
 
+  const pvGuessPanel = $('pvGuessPanel'), pvRevealPanel = $('pvRevealPanel'), pvFinalPanel = $('pvFinalPanel');
+  const pvRoundNo = $('pvRoundNo'), pvRoundTotal = $('pvRoundTotal'), pvGuessTitle = $('pvGuessTitle'), pvGuessArtist = $('pvGuessArtist');
+  const pvGuessBtn = $('pvGuessBtn'), pvGuessMsg = $('pvGuessMsg'), pvMyScoreGuess = $('pvMyScoreGuess');
+  const pvRevealCover = $('pvRevealCover'), pvRevealCoverPlaceholder = $('pvRevealCoverPlaceholder');
+  const pvRevealTitle = $('pvRevealTitle'), pvRevealArtist = $('pvRevealArtist'), pvRevealFun = $('pvRevealFun');
+  const pvMyResult = $('pvMyResult'), pvScoreList = $('pvScoreList'), pvFinalList = $('pvFinalList');
+
   let pvUid = null, pvDetach = null;
+  // Zustand der Handy-Ansicht (wird von den Firebase-Listenern gefüllt, pvRender() zeichnet daraus)
+  let pvMeta = null, pvRound = null, pvResult = null, pvPlayers = [], pvLastN, pvMyGuess = { title: '', artist: '' }, pvSendTimer = null;
 
   function pvMsg(text, isErr){ pvJoinMsg.textContent = text || ''; pvJoinMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
 
   function showJoinPanel(message, isErr){
-    pvLobbyPanel.style.display = 'none';
+    [pvLobbyPanel, pvGuessPanel, pvRevealPanel, pvFinalPanel].forEach(p => { p.style.display = 'none'; });
     pvJoinPanel.style.display = 'block';
     pvMsg(message, isErr);
+  }
+
+  function pvShow(panel){
+    [pvLobbyPanel, pvGuessPanel, pvRevealPanel, pvFinalPanel].forEach(p => { p.style.display = (p === panel) ? 'block' : 'none'; });
+  }
+
+  function guessMsg(text, isErr){ pvGuessMsg.textContent = text || ''; pvGuessMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
+
+  function scoreRows(list){
+    const sorted = list.slice().sort((a, b) => b.score - a.score);
+    return sorted.map((p, i) =>
+      '<div class="mp-player' + (p.uid === pvUid ? ' me' : '') + '"><span style="font-family:var(--mono); color:var(--slate); width:18px;">' + (i + 1) + '</span><span class="nm">' + esc(p.name) + '</span><span style="font-family:var(--display); font-size:20px; color:var(--gold);">' + p.score + '</span></div>'
+    ).join('');
+  }
+
+  // Zeichnet die passende Ansicht aus dem aktuellen Zustand (Lobby / Tippen / Auflösung / Endstand).
+  function pvRender(){
+    if(!pvMeta) return;
+    const me = pvPlayers.find(p => p.uid === pvUid);
+    const myScore = me ? me.score : 0;
+    const phase = pvMeta.phase;
+
+    if(phase === 'finished'){
+      pvFinalList.innerHTML = scoreRows(pvPlayers);
+      pvShow(pvFinalPanel);
+      return;
+    }
+    if(phase === 'playing' && pvRound && pvRound.state === 'guessing'){
+      pvRoundNo.textContent = pvRound.n;
+      pvRoundTotal.textContent = pvRound.total;
+      pvMyScoreGuess.textContent = myScore;
+      pvShow(pvGuessPanel);
+      return;
+    }
+    if(phase === 'playing' && pvRound && pvRound.state === 'reveal' && pvRound.reveal){
+      const rv = pvRound.reveal;
+      pvRevealTitle.textContent = rv.title || '';
+      pvRevealArtist.textContent = rv.artist || '';
+      if(rv.cover){ pvRevealCover.src = rv.cover; pvRevealCover.style.display = 'block'; pvRevealCoverPlaceholder.style.display = 'none'; }
+      else { pvRevealCover.style.display = 'none'; pvRevealCoverPlaceholder.style.display = 'flex'; }
+      if(rv.funFact){ pvRevealFun.textContent = '💡 ' + rv.funFact; pvRevealFun.style.display = 'block'; } else { pvRevealFun.style.display = 'none'; }
+      const res = (pvResult && pvRound && pvResult.round === pvRound.n) ? pvResult : null;
+      pvMyResult.innerHTML = 'Dein Tipp: ' + esc(pvMyGuess.title || '—') + ' / ' + esc(pvMyGuess.artist || '—') + '<br>' +
+        (res ? '<span style="color:var(--gold); font-size:15px;">+' + res.pts + (res.pts === 1 ? ' Punkt' : ' Punkte') + '</span>' : 'Wird bewertet …');
+      pvScoreList.innerHTML = scoreRows(pvPlayers);
+      pvShow(pvRevealPanel);
+      return;
+    }
+    // Lobby bzw. Warten
+    if(pvMeta.hostConnected === false) pvLobbyHint.textContent = 'Der Host ist gerade offline — einen Moment…';
+    else if(phase === 'playing') pvLobbyHint.textContent = 'Gleich geht\'s los …';
+    else pvLobbyHint.textContent = 'Warte, bis der Host das Spiel startet…';
+    pvShow(pvLobbyPanel);
+  }
+
+  // Tipp senden (leer = Tipp zurückziehen). Nur in der Tipp-Phase erlaubt — die Regeln sperren danach.
+  async function pvSendGuess(){
+    clearTimeout(pvSendTimer);
+    if(!db || !pvUid || !pvRound) return;
+    if(pvRound.state !== 'guessing'){ guessMsg('Zu spät — der Host hat schon aufgedeckt.', true); return; }
+    const title = pvGuessTitle.value.trim().slice(0, 80);
+    const artist = pvGuessArtist.value.trim().slice(0, 80);
+    const ref = db.ref('rooms/' + JOIN_CODE + '/guesses/' + pvUid);
+    try{
+      if(!title && !artist){ await ref.remove(); pvMyGuess = { title: '', artist: '' }; guessMsg(''); return; }
+      await ref.set({ round: pvRound.n, title: title, artist: artist });
+      pvMyGuess = { title: title, artist: artist };
+      guessMsg('Gesendet ✓');
+    }catch(e){
+      console.warn(e);
+      guessMsg(/PERMISSION_DENIED/i.test((e && e.message) || '') ? 'Zu spät — der Host hat schon aufgedeckt.' : friendlyError(e), true);
+    }
+  }
+  function pvQueueSend(){
+    guessMsg('…');
+    clearTimeout(pvSendTimer);
+    pvSendTimer = setTimeout(pvSendGuess, 600);
   }
 
   function enterLobby(name){
@@ -2433,8 +2719,11 @@
     const connRef = pRef.child('connected');
     const playersRef = db.ref(base + '/players');
     const metaRef = db.ref(base + '/meta');
+    const roundRef = db.ref(base + '/round');
+    const resultRef = db.ref(base + '/results/' + pvUid);
     const infoRef = db.ref('.info/connected');
 
+    pvMeta = null; pvRound = null; pvResult = null; pvPlayers = []; pvLastN = undefined; pvMyGuess = { title: '', artist: '' };
     pvMyName.textContent = name;
     pvJoinPanel.style.display = 'none';
     pvLobbyPanel.style.display = 'block';
@@ -2449,24 +2738,53 @@
       const me = list.some(p => p.uid === pvUid);
       if(me) seenMe = true;
       else if(seenMe){ pvDetach(); showJoinPanel('Du wurdest vom Host entfernt.', true); return; }
+      pvPlayers = list;
       pvCount.textContent = list.length;
       pvPlayerList.innerHTML = list.map(p =>
         '<div class="mp-player' + (p.uid === pvUid ? ' me' : '') + '">' + dot(p.connected) + '<span class="nm">' + esc(p.name) + '</span></div>'
       ).join('');
+      pvRender();
     });
 
     const metaCb = metaRef.on('value', s => {
       const m = s.val();
       if(!m || m.phase === 'ended'){ pvDetach(); showJoinPanel('Der Host hat den Raum geschlossen.', true); return; }
-      if(m.hostConnected === false) pvLobbyHint.textContent = 'Der Host ist gerade offline — einen Moment…';
-      else if(m.phase === 'playing') pvLobbyHint.textContent = 'Das Spiel läuft. (Raten übers Handy kommt im nächsten Update.)';
-      else pvLobbyHint.textContent = 'Warte, bis der Host das Spiel startet…';
+      pvMeta = m;
+      pvRender();
     });
 
+    // Neue Runde: Eingabe leeren (bzw. eigenen schon gesendeten Tipp nach einem Neuladen wieder einsetzen)
+    const roundCb = roundRef.on('value', s => {
+      pvRound = s.val();
+      const n = pvRound ? pvRound.n : null;
+      if(n !== pvLastN){
+        pvLastN = n;
+        clearTimeout(pvSendTimer);
+        pvGuessTitle.value = ''; pvGuessArtist.value = ''; pvMyGuess = { title: '', artist: '' }; guessMsg('');
+        if(n !== null){
+          db.ref(base + '/guesses/' + pvUid).once('value').then(g => {
+            const v = g.val();
+            if(v && v.round === n && pvLastN === n){
+              pvGuessTitle.value = v.title || ''; pvGuessArtist.value = v.artist || '';
+              pvMyGuess = { title: v.title || '', artist: v.artist || '' };
+              guessMsg('Gesendet ✓');
+              pvRender();
+            }
+          }).catch(() => {});
+        }
+      }
+      pvRender();
+    });
+
+    const resultCb = resultRef.on('value', s => { pvResult = s.val(); pvRender(); });
+
     pvDetach = function(){
+      clearTimeout(pvSendTimer);
       infoRef.off('value', infoCb);
       playersRef.off('value', playersCb);
       metaRef.off('value', metaCb);
+      roundRef.off('value', roundCb);
+      resultRef.off('value', resultCb);
       connRef.onDisconnect().cancel().catch(() => {});
       pvDetach = null;
     };
@@ -2487,11 +2805,17 @@
       if(meta.phase === 'ended') throw new Error('Dieser Raum ist geschlossen.');
       const pRef = db.ref(base + '/players/' + pvUid);
       const existing = await pRef.once('value');
+      // Jeder Wert einzeln an seinem eigenen Pfad — so greifen die Feld-Regeln eindeutig.
       if(existing.exists()){
-        await pRef.update({ name: name, connected: true });
+        await Promise.all([pRef.child('name').set(name), pRef.child('connected').set(true)]);
       }else{
         if(meta.phase !== 'lobby') throw new Error('Das Spiel läuft schon — Beitritt jetzt nicht mehr möglich.');
-        await pRef.update({ name: name, connected: true, score: 0, joinedAt: firebase.database.ServerValue.TIMESTAMP });
+        await Promise.all([
+          pRef.child('name').set(name),
+          pRef.child('connected').set(true),
+          pRef.child('score').set(0),
+          pRef.child('joinedAt').set(firebase.database.ServerValue.TIMESTAMP)
+        ]);
       }
       try{ localStorage.setItem(PLAYER_NAME_KEY, name); }catch(e){}
       pvMsg('');
@@ -2518,6 +2842,9 @@
     if(JOIN_CODE.length !== 4){ pvJoinBtn.disabled = true; pvMsg('Ungültiger Beitritts-Link.', true); return; }
     pvJoinBtn.addEventListener('click', pvJoin);
     pvLeaveBtn.addEventListener('click', pvLeave);
+    pvGuessTitle.addEventListener('input', pvQueueSend);
+    pvGuessArtist.addEventListener('input', pvQueueSend);
+    pvGuessBtn.addEventListener('click', pvSendGuess);
     pvNameInput.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); pvJoin(); } });
 
     // War dieses Gerät schon im Raum (z. B. Seite neu geladen), direkt wieder in die Lobby.
