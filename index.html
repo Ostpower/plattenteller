@@ -156,10 +156,22 @@
   .track-meta .a{color:var(--slate); font-size:12.5px; display:flex; min-width:0;}
   .track-meta .a .an{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
   .track-meta .a .yr{white-space:pre; flex-shrink:0;}
+  .track-meta .a .yr.ok{color:var(--gold);}
+  .track-meta .a .yr.warn{color:var(--coral);}
   .pl-row{display:flex; align-items:center; gap:8px; background:var(--groove); border:1px solid var(--line); border-radius:14px; padding:9px 10px 9px 14px; margin-top:8px;}
   .pl-meta{flex:1; min-width:0;}
   .pl-meta .t{font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .pl-meta .a{color:var(--slate); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .tl-card{display:flex; align-items:center; gap:14px; padding:11px 14px; background:var(--groove); border:1px solid var(--line); border-radius:14px;}
+  .tl-card .y{font-size:24px; font-weight:700; color:var(--gold); min-width:62px; letter-spacing:-0.02em;}
+  .tl-card .m{font-size:13px; color:var(--slate); line-height:1.35; min-width:0;}
+  .tl-card .m b{color:var(--cream); font-weight:600;}
+  .tl-card.new{border-color:var(--gold); background:rgba(61,220,151,0.1);}
+  .tl-slot{display:block; width:100%; min-height:30px; height:30px; margin:5px 0; padding:0; background:transparent; border:1px dashed var(--line-2); border-radius:10px; color:var(--dim); font-size:12px; font-weight:500;}
+  .tl-slot.sel{height:48px; border-style:solid; border-color:var(--gold); background:rgba(61,220,151,0.12); color:var(--gold); font-weight:600; font-size:14px;}
+  .tl-slot:disabled{opacity:0.45;}
+  #pvHitSend{position:sticky; bottom:14px; z-index:3; box-shadow:0 0 0 6px var(--panel);}
+  .hit-year{font-size:44px; font-weight:700; letter-spacing:-0.03em; color:var(--gold); line-height:1;}
   .dbg-h{font-size:12px; font-weight:600; color:var(--cream); margin:16px 0 4px;}
   .dbg-row{display:flex; justify-content:space-between; gap:14px; padding:7px 0; border-top:1px solid var(--line); font-size:13px;}
   .dbg-row .k{color:var(--slate); flex-shrink:0;}
@@ -390,6 +402,14 @@
       <div id="trackListWrap" style="margin-top:14px;">
         <span class="track-count" id="trackCount" style="display:none;">0 Songs im Stapel</span>
         <button class="btn-ghost btn-sm" id="clearTracksBtn" style="display:none; margin:0 0 6px 8px;">Alle entfernen</button>
+        <div id="yearBar" style="display:none; margin:6px 0 10px;">
+          <div class="empty-note" id="yearStatus" style="margin:0 0 8px;"></div>
+          <div class="row">
+            <button class="btn-ghost btn-sm" id="yearsBtn">Jahre ermitteln</button>
+            <button class="btn-ghost btn-sm" id="yearsCancelBtn" style="display:none;">Abbrechen</button>
+            <button class="btn-ghost btn-sm" id="dropUnsureBtn" style="display:none;">Unsichere entfernen</button>
+          </div>
+        </div>
         <div id="trackList"></div>
       </div>
 
@@ -493,8 +513,9 @@
       <div class="pick-group" id="modeChips">
         <div class="pick-chip selected" data-mode="sequential">Reihenfolge</div>
         <div class="pick-chip" data-mode="together">Zusammen</div>
+        <div class="pick-chip" data-mode="hitster">Hitster</div>
       </div>
-      <p class="hint" id="modeHint" style="margin-top:-8px;">Reihenfolge: einer ist abwechselnd dran, mit Streak-Bonus &amp; Klau-Powerup. Zusammen: alle hören denselben Song und tippen parallel (eigenes Handy oder mündlich/Zettel — jede*r wird danach einzeln bewertet, kein Streak/Klau).</p>
+      <p class="hint" id="modeHint" style="margin-top:-8px;">Reihenfolge: einer ist abwechselnd dran, mit Streak-Bonus &amp; Klau-Powerup. Zusammen: alle hören denselben Song und tippen parallel (eigenes Handy oder mündlich/Zettel — jede*r wird danach einzeln bewertet, kein Streak/Klau). Hitster: jede*r baut mit dem eigenen Handy eine Zeitleiste und sortiert die Songs nach Erscheinungsjahr ein — nur mit Raum (Handys); die meisten Karten gewinnen.</p>
     </div>
 
     <div class="panel" id="mpHostPanel">
@@ -601,7 +622,7 @@
         <div id="togetherFunFactBox" style="display:none; font-family:var(--mono); font-size:12.5px; color:var(--slate); background:var(--groove); border-radius:10px; padding:10px 12px; margin:-6px 0 16px;">
           <span style="color:var(--gold); font-weight:600;">Fun Fact</span> · <span id="togetherFunFactText"></span>
         </div>
-        <p class="hint" style="margin-bottom:10px;">Jede*r einzeln bewerten:</p>
+        <p class="hint" id="togetherJudgeHint" style="margin-bottom:10px;">Jede*r einzeln bewerten:</p>
         <div id="togetherJudgeList"></div>
         <button class="btn-coral btn-block" id="togetherNextRoundBtn" style="margin-top:8px;" disabled>Nächster Song →</button>
       </div>
@@ -675,6 +696,36 @@
     <button class="btn-ghost btn-block pv-leave" style="margin-top:10px; font-size:12.5px;">Spiel verlassen</button>
   </div>
 
+  <div class="panel" id="pvHitPanel" style="display:none;">
+    <div class="eq eq-sm" id="pvHitEq" aria-hidden="true"><span class="bar" style="height:37px;animation-delay:-0.10s"></span><span class="bar" style="height:52px;animation-delay:-0.50s"></span><span class="bar" style="height:27px;animation-delay:-0.90s"></span><span class="bar" style="height:44px;animation-delay:-0.30s"></span><span class="bar" style="height:34px;animation-delay:-0.70s"></span><span class="bar" style="height:52px;animation-delay:-0.20s"></span><span class="bar" style="height:23px;animation-delay:-0.80s"></span><span class="bar" style="height:47px;animation-delay:-0.40s"></span><span class="bar" style="height:39px;animation-delay:-1.00s"></span><span class="bar" style="height:52px;animation-delay:-0.60s"></span><span class="bar" style="height:29px;animation-delay:-0.15s"></span><span class="bar" style="height:43px;animation-delay:-0.75s"></span><span class="bar" style="height:52px;animation-delay:-0.35s"></span><span class="bar" style="height:26px;animation-delay:-0.95s"></span><span class="bar" style="height:40px;animation-delay:-0.25s"></span></div>
+    <h2>Song <span id="pvHitNo" style="color:var(--gold);"></span> <span style="color:var(--slate); font-size:0.7em;">von <span id="pvHitTotal"></span></span></h2>
+    <p class="hint" id="pvHitHint">Warte, bis der Host den Song startet …</p>
+    <div id="pvTimelineEl"></div>
+    <button class="btn-gold btn-block" id="pvHitSend" style="margin-top:12px;" disabled>Einsortieren</button>
+    <div class="mp-msg" id="pvHitMsg"></div>
+    <div style="font-size:12px; color:var(--slate); margin-top:10px;">Deine Karten: <span id="pvHitCards" style="color:var(--gold);">1</span></div>
+    <button class="btn-ghost btn-block pv-leave" style="margin-top:14px; font-size:12.5px;">Spiel verlassen</button>
+  </div>
+
+  <div class="panel" id="pvHitRevealPanel" style="display:none;">
+    <div class="hit-year" id="pvHitYear"></div>
+    <div class="reveal-card" style="margin-top:12px;">
+      <img id="pvHitCover" src="" alt="" style="display:none;">
+      <div id="pvHitCoverPh" class="placeholder-cover" style="width:64px;height:64px;">♪</div>
+      <div>
+        <div class="rt" id="pvHitTitle"></div>
+        <div class="ra" id="pvHitArtist"></div>
+      </div>
+    </div>
+    <div id="pvHitResult" style="font-size:14px; margin-bottom:14px;"></div>
+    <label>Deine Zeitleiste</label>
+    <div id="pvTimelineAfter" style="margin-bottom:16px;"></div>
+    <label>Rangliste (Karten)</label>
+    <div id="pvHitScoreList"></div>
+    <p class="hint" style="margin:10px 0 0;">Warte auf den nächsten Song…</p>
+    <button class="btn-ghost btn-block pv-leave" style="margin-top:10px; font-size:12.5px;">Spiel verlassen</button>
+  </div>
+
   <div class="panel" id="pvFinalPanel" style="display:none;">
     <h2>Spiel vorbei!</h2>
     <div id="pvFinalList"></div>
@@ -700,7 +751,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-11.3';
+  const APP_VERSION = '2026-10-11.5';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -1278,7 +1329,9 @@
                 artist: t.artists.map(a => a.name).join(', '),
                 artistKey: t.artists[0] ? t.artists[0].id : t.artists.map(a=>a.name).join(','),
                 cover: (t.album && t.album.images && t.album.images.length) ? t.album.images[t.album.images.length > 2 ? 1 : 0].url : '',
-          year: yearOf(t)
+          year: yearOf(t),
+          isrc: (t.external_ids && t.external_ids.isrc) || '',
+          albumType: (t.album && t.album.album_type) || ''
               };
               if(hasNonLatinScript(mapped.title) || hasNonLatinScript(mapped.artist)) return; // für dieses Ratespiel nicht lesbar/erratbar
               if(!seenRawIds.has(mapped.id)){ seenRawIds.add(mapped.id); rawCollected.push(mapped); }
@@ -1423,7 +1476,7 @@
     const pool = [];
     // Spotify liefert den Song seit 2026 im Feld "item" — "track" ist veraltet und kommt ggf. nicht mehr.
     // Beide anfragen, damit es auch mit älteren Antworten funktioniert.
-    const trackFields = 'type,id,uri,name,popularity,artists(id,name),album(images,release_date)';
+    const trackFields = 'type,id,uri,name,popularity,artists(id,name),album(images,release_date,album_type),external_ids(isrc)';
     let url = 'https://api.spotify.com/v1/playlists/' + playlistId + '/items?limit=100&fields=next,items(item(' + trackFields + '),track(' + trackFields + '))';
     let pageCount = 0;
     let skippedNonLatin = 0;
@@ -1445,7 +1498,9 @@
           artist: artist,
           artistKey: t.artists[0] ? t.artists[0].id : t.artists.map(a=>a.name).join(','),
           cover: (t.album && t.album.images && t.album.images.length) ? t.album.images[t.album.images.length > 2 ? 1 : 0].url : '',
-          year: yearOf(t)
+          year: yearOf(t),
+          isrc: (t.external_ids && t.external_ids.isrc) || '',
+          albumType: (t.album && t.album.album_type) || ''
         });
       });
       url = data.next;
@@ -1866,6 +1921,152 @@
       console.error('MusicBrainz:', err);
     }
   };
+
+  // ---------- JAHRE ERMITTELN (für Hitster) ----------
+  // Jahr = Erstveröffentlichung laut MusicBrainz (gefunden über die ISRC), ersatzweise das Albumjahr von Spotify.
+  // Live-Versionen, Remixe und Compilations werden erkannt: dann wird die Originalaufnahme gesucht; findet sich keine,
+  // gilt das Jahr als unsicher (⚠) und der Song wird im Hitster-Modus nicht verwendet. Ergebnisse werden gemerkt.
+  const YEAR_CACHE_KEY = 'plattenteller_year_cache';
+  const MB_GAP = (typeof window.PT_MB_GAP_MS === 'number') ? window.PT_MB_GAP_MS : 1100; // MusicBrainz: ca. 1 Anfrage/s
+  let yearCache = {};
+  try{ yearCache = JSON.parse(localStorage.getItem(YEAR_CACHE_KEY) || '{}') || {}; }catch(e){ yearCache = {}; }
+  function saveYearCache(){ try{ localStorage.setItem(YEAR_CACHE_KEY, JSON.stringify(yearCache)); }catch(e){} }
+  const UNSURE_TITLE = /\b(live|remix|acoustic|unplugged|demo|karaoke|instrumental|sessions?|rehearsal|cover|tribute)\b/i;
+  const yearBar = document.getElementById('yearBar');
+  const yearStatus = document.getElementById('yearStatus');
+  const yearsBtn = document.getElementById('yearsBtn');
+  const yearsCancelBtn = document.getElementById('yearsCancelBtn');
+  const dropUnsureBtn = document.getElementById('dropUnsureBtn');
+  let yearRun = null;
+
+  function recLooksLive(r){
+    return /live|konzert|concert/i.test(r.disambiguation || '') || /^\d{4}-\d{2}-\d{2}:/.test(r.releases && r.releases[0] ? (r.releases[0].title || '') : '');
+  }
+  // "Song - Remastered 2011", "Song (Live at …)" → "Song"
+  function cleanTitleForSearch(title){
+    return String(title)
+      .replace(/\s*[-–—]\s*(remaster(ed)?(\s*\d{4})?|\d{4}\s*remaster(ed)?|live\b.*|single version|radio edit|mono|stereo|acoustic.*|demo.*|remix.*|album version|bonus track|instrumental.*|unplugged.*)\s*$/i, '')
+      .replace(/\s*[\(\[]\s*(remaster(ed)?[^\)\]]*|live[^\)\]]*|acoustic[^\)\]]*|demo[^\)\]]*|remix[^\)\]]*|unplugged[^\)\]]*|bonus[^\)\]]*)[\)\]]\s*/ig, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+  async function mbJsonRetry(url, tries){
+    tries = tries || 3;
+    for(let i = 0; ; i++){
+      try{ return await mbJson(url); }
+      catch(e){
+        if((e.status === 503 || e.status === 429) && i < tries - 1){ await sleep(2500 * (i + 1)); continue; }
+        throw e;
+      }
+    }
+  }
+  // Frühestes Erscheinungsjahr einer Studio-Aufnahme dieses Titels von diesem Interpreten
+  async function findOriginalYear(title, artist){
+    const q = 'recording:"' + title.replace(/"/g, '') + '" AND artist:"' + artist.replace(/"/g, '') + '"';
+    const data = await mbJsonRetry('https://musicbrainz.org/ws/2/recording/?query=' + encodeURIComponent(q) + '&fmt=json&limit=25');
+    const wantT = normalize(title), wantA = normalize(artist);
+    const ok = (data.recordings || []).filter(r => {
+      if(r.score != null && r.score < 85) return false;
+      if(normalize(r.title) !== wantT || !r['first-release-date'] || recLooksLive(r)) return false;
+      const credits = r['artist-credit'] || [];
+      return !credits.length || credits.some(c => { const n = normalize(c.name || (c.artist && c.artist.name) || ''); return n && (n.includes(wantA) || wantA.includes(n)); });
+    });
+    ok.sort((a, b) => a['first-release-date'].localeCompare(b['first-release-date']));
+    return ok[0] ? parseInt(ok[0]['first-release-date'].slice(0, 4), 10) : null;
+  }
+
+  // Ein Song: Ergebnis steht danach in t.yr = { y, src, unsure }. Rückgabe: true, wenn MusicBrainz angefragt wurde.
+  async function resolveOne(t){
+    const artist1 = String(t.artist).split(',')[0].trim();
+    const keyTA = 'ta:' + normalize(t.title) + '|' + normalize(artist1);
+    let hit = (t.isrc && yearCache['isrc:' + t.isrc]) || yearCache[keyTA];
+    if(hit){ t.yr = hit; return false; }
+    if(!t.isrc && String(t.id).startsWith('sp_') && accessToken){ // ISRC einzeln bei Spotify holen
+      try{
+        const sp = await spotifyApiJson('https://api.spotify.com/v1/tracks/' + String(t.id).slice(3), '');
+        t.isrc = (sp.external_ids && sp.external_ids.isrc) || '';
+        t.albumType = (sp.album && sp.album.album_type) || t.albumType || '';
+        if(!t.year) t.year = yearOf(sp);
+      }catch(e){ /* ohne ISRC weiter */ }
+      if(t.isrc && yearCache['isrc:' + t.isrc]){ t.yr = yearCache['isrc:' + t.isrc]; return false; }
+    }
+    let best = null;
+    if(t.isrc){
+      try{ const d = await mbJsonRetry('https://musicbrainz.org/ws/2/isrc/' + encodeURIComponent(t.isrc) + '?inc=artist-credits&fmt=json'); best = pickBestRecording(d.recordings || []); }
+      catch(e){ if(e.status !== 404) throw e; }
+      await sleep(MB_GAP);
+    }
+    let y = best && best['first-release-date'] ? parseInt(String(best['first-release-date']).slice(0, 4), 10) : null;
+    let src = y ? 'mb' : '';
+    const spY = t.year || null;
+    if(!y && spY){ y = spY; src = 'spotify'; }
+    const titleFlag = UNSURE_TITLE.test(t.title);
+    const liveFlag = !!(best && /live|konzert|concert/i.test(best.disambiguation || ''));
+    const compFlag = t.albumType === 'compilation';
+    let unsure = false;
+    // Kein sauberer MusicBrainz-Treffer, Live/Remix oder Compilation: Originalaufnahme suchen
+    if(titleFlag || liveFlag || src !== 'mb'){
+      let orig = null;
+      try{ orig = await findOriginalYear(cleanTitleForSearch(t.title), artist1); }catch(e){ /* Suche fehlgeschlagen: mit dem Vorhandenen weiter */ }
+      await sleep(MB_GAP);
+      if(orig){ y = orig; src = 'mb-orig'; }
+      else if(titleFlag || liveFlag) unsure = true;       // Live/Remix ohne gefundene Originalaufnahme
+      else if(compFlag && src !== 'mb') unsure = true;    // Compilation ohne MusicBrainz-Bestätigung
+    }
+    if(!y) unsure = true;
+    t.yr = { y: y || null, src: src || 'keine', unsure: unsure };
+    if(t.isrc) yearCache['isrc:' + t.isrc] = t.yr;
+    yearCache[keyTA] = t.yr;
+    return true;
+  }
+
+  function renderYearStatus(){
+    yearBar.style.display = tracks.length ? 'block' : 'none';
+    if(yearRun){ return; }
+    const ok = tracks.filter(t => t.yr && !t.yr.unsure).length;
+    const unsure = tracks.filter(t => t.yr && t.yr.unsure).length;
+    const open = tracks.length - ok - unsure;
+    yearStatus.textContent = ok + (ok === 1 ? ' Song' : ' Songs') + ' mit sicherem Jahr' + (unsure ? ', ' + unsure + ' unsicher ⚠' : '') + (open ? ', ' + open + ' noch nicht geprüft' : '') + '.';
+    yearsBtn.style.display = open ? 'inline-block' : 'none';
+    yearsCancelBtn.style.display = 'none';
+    dropUnsureBtn.style.display = unsure ? 'inline-block' : 'none';
+  }
+
+  function runYearResolver(){
+    if(yearRun) return yearRun.promise;
+    const todo = tracks.filter(t => !t.yr);
+    if(!todo.length){ renderYearStatus(); return Promise.resolve(); }
+    const run = { cancel: false };
+    yearRun = run;
+    yearsBtn.style.display = 'none';
+    dropUnsureBtn.style.display = 'none';
+    yearsCancelBtn.style.display = 'inline-block';
+    yearStatus.textContent = 'Jahre werden geprüft … 0 von ' + todo.length;
+    run.promise = (async () => {
+      let done = 0, failed = 0;
+      for(const t of todo){
+        if(run.cancel) break;
+        try{ await resolveOne(t); }
+        catch(e){ failed++; console.warn('Jahr ermitteln:', t.title, e); }
+        done++;
+        yearStatus.textContent = 'Jahre werden geprüft … ' + done + ' von ' + todo.length + (failed ? ' (' + failed + ' Fehler)' : '');
+        if(done % 5 === 0){ saveYearCache(); saveTracks(); }
+      }
+      saveYearCache();
+      yearRun = null;
+      renderTracks();
+    })();
+    return run.promise;
+  }
+  yearsBtn.onclick = runYearResolver;
+  yearsCancelBtn.onclick = () => { if(yearRun) yearRun.cancel = true; };
+  dropUnsureBtn.onclick = () => {
+    const n = tracks.filter(t => t.yr && t.yr.unsure).length;
+    if(!n || !window.confirm(n + ' Songs mit unsicherem Jahr aus dem Stapel entfernen?')) return;
+    tracks = tracks.filter(t => !(t.yr && t.yr.unsure));
+    renderTracks();
+    checkStart();
+  };
+
   debugCopyBtn.onclick = async () => {
     try{ await navigator.clipboard.writeText(debugReport); debugCopyBtn.textContent = 'Kopiert ✓'; }
     catch(e){ debugCopyBtn.textContent = 'Kopieren nicht möglich'; }
@@ -1946,8 +2147,18 @@
     checkStart();
   };
 
+  // Jahr im Stapel: grün = geprüft, rot mit Warnzeichen = unsicher, grau = nur Spotify-Albumjahr (ungeprüft)
+  function yearTag(t){
+    if(t.yr){
+      if(t.yr.unsure) return '<span class="yr warn" title="Jahr unsicher (Live-Version, Neuauflage …)"> · ' + (t.yr.y || '?') + ' ⚠</span>';
+      return '<span class="yr ok" title="Jahr geprüft"> · ' + t.yr.y + '</span>';
+    }
+    return t.year ? '<span class="yr"> · ' + t.year + '</span>' : '';
+  }
+
   function renderTracks(){
     saveTracks();
+    renderYearStatus();
     clearTracksBtn.style.display = tracks.length ? 'inline-block' : 'none';
     trackCount.style.display = tracks.length ? 'inline-block' : 'none';
     trackCount.textContent = tracks.length + (tracks.length===1 ? ' Song im Stapel' : ' Songs im Stapel');
@@ -1959,7 +2170,7 @@
         ${t.cover ? `<img src="${t.cover}" alt="">` : `<div class="placeholder-cover">♪</div>`}
         <div class="track-meta">
           <div class="t">${escapeHtml(t.title)}</div>
-          <div class="a"><span class="an">${escapeHtml(t.artist)}</span>${t.year ? '<span class="yr"> · ' + t.year + '</span>' : ''}</div>
+          <div class="a"><span class="an">${escapeHtml(t.artist)}</span>${yearTag(t)}</div>
         </div>
       `;
       const rm = document.createElement('button');
@@ -1976,13 +2187,6 @@
   const addPlayerBtn = document.getElementById('addPlayerBtn');
   const playerChips = document.getElementById('playerChips');
   const startGameBtn = document.getElementById('startGameBtn');
-
-  // Beim Start (erst jetzt, weil checkStart() den Start-Knopf braucht): gemerkte Playlists und gesicherte Songauswahl wiederherstellen
-  loadSavedPlaylists();
-  renderSavedPlaylists();
-  restoreTracks();
-  renderTracks();
-  checkStart();
 
   function renderPlayers(){
     playerChips.innerHTML = '';
@@ -2013,7 +2217,19 @@
     const remoteCount = mp ? mp.getRoomPlayers().length : 0;
     startGameBtn.disabled = !((players.length >= 1 || remoteCount >= 1) && tracks.length >= 1);
     const hint = document.getElementById('remoteStartHint');
-    if(remoteCount >= 1){
+    if(chosenMode === 'hitster'){
+      // Hitster läuft nur über Handys im Raum
+      startGameBtn.disabled = !(remoteCount >= 1 && tracks.length >= 1);
+      hint.style.display = 'block';
+      if(remoteCount < 1){
+        hint.textContent = 'Hitster braucht einen Raum mit Handys — oben bei „Mehrere Handys“ einen Raum erstellen und Mitspieler beitreten lassen.';
+      }else{
+        const open = tracks.filter(t => !t.yr).length;
+        const el = hitsterEligible().length;
+        hint.textContent = 'Hitster mit ' + remoteCount + ' Handy-Spielern. ' + (open ? open + ' Songs noch ohne geprüftes Jahr (wird beim Start automatisch geprüft). ' : '') +
+          el + ' Songs mit sicherem Jahr · jede*r bekommt zuerst eine Startkarte, der Rest sind die Runden' + (open ? ' (Anzahl steht nach der Prüfung fest)' : ': ' + Math.max(0, el - remoteCount) + ' Runden') + '.';
+      }
+    }else if(remoteCount >= 1){
       hint.style.display = 'block';
       hint.textContent = 'Das Spiel startet mit den ' + remoteCount + ' Handy-Spielern aus dem Raum (Modus „Zusammen“). Spieler aus der lokalen Liste oben werden dabei nicht verwendet.';
     }else{
@@ -2034,6 +2250,8 @@
   let judgeUids = null;        // wer in DIESER Runde bewertet wird (Stand beim Aufdecken)
   let judgeTotal = 0;          // Anzahl der Bewertungszeilen dieser Runde
   let judgeRowApi = {};        // uid -> Funktion, die die Zeile bewertet (für Automatik/Wiederherstellung)
+  let hTimelines = {};         // Hitster: uid -> Zeitleiste [{ y, t, a, r }] (Jahr, Titel, Interpret, Runde)
+  let hResults = [];           // Hitster: Ergebnisse der aktuellen Runde (für Anzeige/Wiederherstellung)
   let gameStage = 'guessing';  // 'guessing' | 'reveal' | 'end' — für die Wiederherstellung nach einem Neuladen
   let judgedMap = {};          // uid -> gewählte Bewertung dieser Runde (für die Wiederherstellung)
   const GAME_KEY = 'plattenteller_host_game';
@@ -2047,6 +2265,9 @@
     const m = Math.floor(sec / 60), r = Math.floor(sec % 60);
     return m + ':' + (r < 10 ? '0' : '') + r + ' min';
   }
+
+  // Songs mit sicherem Jahr (nur die kommen im Hitster-Modus vor)
+  function hitsterEligible(){ return tracks.filter(t => t.yr && !t.yr.unsure && t.yr.y); }
 
   // ---------- Handy-Spiel sichern / wiederherstellen ----------
   // Das laufende Handy-Spiel wird nach jedem Schritt im Browser gesichert. Lädt die Host-Seite neu
@@ -2063,7 +2284,8 @@
         players: players.map(p => ({ name: p.name, uid: p.uid, score: p.score })),
         localPlayers: (localPlayersBackup || []).map(p => ({ name: p.name })),
         remoteRound: remoteRound, stage: gameStage, songStartSent: songStartSent,
-        guesses: togetherGuesses, judged: judgedMap, judgeUids: judgeUids
+        guesses: togetherGuesses, judged: judgedMap, judgeUids: judgeUids,
+        gameMode: gameMode, hTimelines: hTimelines, hResults: hResults
       }));
       saveError = '';
     }catch(e){ saveError = (e && e.message) || String(e); /* Speicher voll/gesperrt: Spiel läuft trotzdem, nur ohne Wiederherstellung */ }
@@ -2155,7 +2377,9 @@
     localPlayersBackup = (saved.localPlayers || []).map(p => ({ name: p.name, score: 0, streak: 0, stealAvailable: false, stealUsed: false }));
     players = saved.players.map(p => ({ name: p.name, uid: p.uid, score: p.score || 0, streak: 0, stealAvailable: false, stealUsed: false }));
     remoteGame = true;
-    gameMode = 'together';
+    gameMode = saved.gameMode === 'hitster' ? 'hitster' : 'together';
+    hTimelines = saved.hTimelines || {};
+    hResults = saved.hResults || [];
     remoteRound = saved.remoteRound || 0;
     judgedMap = saved.judged || {};
     judgeUids = Array.isArray(saved.judgeUids) ? saved.judgeUids : null;
@@ -2181,7 +2405,8 @@
       stealBox.style.display = 'none';
       mp.resumeRound();
       showTogetherReveal(t);
-      renderTogetherJudgeList(t, judgedMap);
+      if(gameMode === 'hitster'){ renderHitsterResults(hResults); togetherNextRoundBtn.disabled = false; }
+      else renderTogetherJudgeList(t, judgedMap);
     }else{
       // Tippphase: Song neu laden (pausiert). Runde und Tipps bleiben in Firebase unverändert.
       loadNextTrack(true);
@@ -2208,6 +2433,8 @@
       gameMode = chip.getAttribute('data-mode');
       chosenMode = gameMode;
       [...modeChipsEl.children].forEach(c => c.classList.toggle('selected', c === chip));
+      if(chosenMode === 'hitster' && tracks.some(t => !t.yr)) runYearResolver(); // Jahre schon mal im Hintergrund prüfen
+      checkStart();
     };
   });
 
@@ -2288,9 +2515,55 @@
     if(wakeLockWanted && document.visibilityState === 'visible') requestWakeLock();
   });
 
-  startGameBtn.onclick = () => {
+  // Hitster starten: jede*r bekommt eine Startkarte, der Rest des Stapels sind die Runden
+  function startHitster(roomPlayers, eligible){
+    const mp = MP();
+    remoteGame = true;
+    localPlayersBackup = players;
+    players = roomPlayers.map(rp => ({ name: rp.name, uid: rp.uid, score: 0, streak: 0, stealAvailable: false, stealUsed: false }));
+    gameMode = 'hitster';
+    remoteRound = 0; judgedMap = {}; judgeUids = null; hResults = []; hTimelines = {};
+    const pool = shuffle(tracks.map((_, i) => i).filter(i => tracks[i].yr && !tracks[i].yr.unsure && tracks[i].yr.y));
+    players.forEach(p => {
+      const t = tracks[pool.pop()];
+      hTimelines[p.uid] = [{ y: t.yr.y, t: t.title, a: t.artist, r: 0 }];
+      p.score = 1;
+    });
+    deck = pool;
+    totalDeckSize = deck.length;
+    currentPlayerIdx = 0;
+    mp.onGameStart(players.map(p => p.uid), 'hitster').then(() => mp.onTimelines(hTimelines)).catch(syncError);
+    setupScreen.style.display = 'none';
+    gameScreen.style.display = 'block';
+    endScreen.style.display = 'none';
+    requestWakeLock();
+    loadNextTrack();
+    renderScoreboard();
+  }
+
+  startGameBtn.onclick = async () => {
     mpSyncMsg.textContent = '';
     const mp = MP();
+    if(chosenMode === 'hitster'){
+      const roomPlayers = mp ? mp.getRoomPlayers() : [];
+      if(roomPlayers.length < 1){ checkStart(); return; }
+      const hint = document.getElementById('remoteStartHint');
+      if(tracks.some(t => !t.yr)){
+        startGameBtn.disabled = true;
+        hint.style.display = 'block';
+        hint.textContent = 'Jahre werden geprüft … bitte kurz warten (nur beim ersten Mal, danach sind sie gemerkt).';
+        await runYearResolver();
+        startGameBtn.disabled = false;
+      }
+      const eligible = hitsterEligible();
+      if(eligible.length < roomPlayers.length + 1){
+        hint.style.display = 'block';
+        hint.textContent = 'Zu wenige Songs mit sicherem Jahr (' + eligible.length + '). Für ' + roomPlayers.length + ' Spieler braucht es mindestens ' + (roomPlayers.length + 1) + ' — bitte mehr Songs laden.';
+        return;
+      }
+      startHitster(roomPlayers, eligible);
+      return;
+    }
     remoteGame = !!(mp && mp.getRoomPlayers().length >= 1);
     if(remoteGame){
       localPlayersBackup = players;
@@ -2352,7 +2625,7 @@
     brandDot.classList.remove('is-playing');
     nowStatus.textContent = 'Bereit — Play antippen';
 
-    if(gameMode === 'together'){
+    if(gameMode === 'together' || gameMode === 'hitster'){
       guessPanel.style.display = 'none';
       revealPanel.style.display = 'none';
       stealBox.style.display = 'none';
@@ -2376,7 +2649,7 @@
       togetherRevealPanel.style.display = 'none';
       togetherNextRoundBtn.disabled = true;
       gameStage = 'guessing';
-      if(!resume){ judgedMap = {}; judgeUids = null; lastGuessMap = {}; togetherGuesses = []; }
+      if(!resume){ judgedMap = {}; judgeUids = null; lastGuessMap = {}; togetherGuesses = []; hResults = []; }
       saveGame();
     } else {
       remoteRoundOpen = false;
@@ -2573,15 +2846,15 @@
     const done = active.filter(p => lastGuessMap[p.uid]).length;
     const started = MP() ? MP().getStartedAt() : null;
     togetherGuessList.innerHTML =
-      '<div class="hint" style="margin-bottom:8px;">' + done + ' von ' + active.length + ' haben getippt</div>' +
+      '<div class="hint" style="margin-bottom:8px;">' + done + ' von ' + active.length + (gameMode === 'hitster' ? ' haben einsortiert' : ' haben getippt') + '</div>' +
       shown.map(p => {
         const g = lastGuessMap[p.uid];
         const online = !p.left && p.connected !== false;
         let label;
         if(p.left) label = 'ausgestiegen';
-        else if(g) label = '✓ getippt' + ((g.at && started) ? ' · ' + fmtDur(g.at - started) : '');
+        else if(g) label = (gameMode === 'hitster' ? '✓ einsortiert' : '✓ getippt') + ((g.at && started) ? ' · ' + fmtDur(g.at - started) : '');
         else if(p.connected === false) label = 'offline';
-        else label = 'tippt …';
+        else label = gameMode === 'hitster' ? 'überlegt …' : 'tippt …';
         return '<div class="mp-player"><span class="dot' + (online ? ' ok' : '') + '"></span><span class="nm">' + escapeHtml(p.name) + '</span>' +
           '<span style="font-family:var(--mono); font-size:11.5px; color:var(--slate);">' + label + '</span>' +
           '<button class="mp-kick" data-uid="' + escapeHtml(p.uid || '') + '" title="Aus dem Spiel entfernen">×</button></div>';
@@ -2607,7 +2880,9 @@
     const hintEl = document.getElementById('togetherGuessHint');
     if(unsubGuesses){ unsubGuesses(); unsubGuesses = null; }
     if(remoteGame){
-      hintEl.textContent = 'Alle tippen auf dem eigenen Handy. Wenn genug getippt haben, hier aufdecken.';
+      hintEl.textContent = gameMode === 'hitster'
+        ? 'Alle sortieren den Song auf ihrem Handy in ihre Zeitleiste ein. Wenn alle fertig sind, hier aufdecken.'
+        : 'Alle tippen auf dem eigenen Handy. Wenn genug getippt haben, hier aufdecken.';
       renderRemoteGuessStatus({});
       unsubGuesses = MP() ? MP().onGuessesChange(renderRemoteGuessStatus) : null;
       return;
@@ -2633,12 +2908,14 @@
     if(t && t.source === 'deezer'){ deezerAudio.pause(); } else if(controller){ controller.pause(); }
 
     remoteRoundOpen = false;
+    let revealMap = {};
     if(remoteGame && MP()){
       // Erst sperren + Lösung veröffentlichen, dann die (nun endgültigen) Tipps lesen.
       togetherRevealBtn.disabled = true;
       try{
         if(unsubGuesses){ unsubGuesses(); unsubGuesses = null; }
-        const map = await MP().reveal({ title: t.title, artist: t.artist, cover: t.cover || '', funFact: t.funFact || '' });
+        const map = await MP().reveal({ title: t.title, artist: t.artist, cover: t.cover || '', funFact: t.funFact || '', year: (t.yr && t.yr.y) || null });
+        revealMap = map;
         togetherGuesses = players.map(p => map[p.uid] || { title: '', artist: '' });
       }catch(e){
         syncError(e);
@@ -2655,11 +2932,55 @@
 
     gameStage = 'reveal';
     judgedMap = {};
+    if(gameMode === 'hitster'){
+      // Automatisch auswerten: passt das Jahr zwischen die Nachbarkarten, wandert die Karte in die Zeitleiste
+      hResults = computeHitsterResults(t, revealMap);
+      renderScoreboard();
+      saveGame();
+      showTogetherReveal(t);
+      renderHitsterResults(hResults);
+      togetherNextRoundBtn.disabled = false;
+      if(MP()) MP().onHitsterResults(remoteRound, hResults.map(r => ({ uid: r.uid, ok: r.ok, slot: r.slot, timeline: hTimelines[r.uid] || [] }))).catch(syncError);
+      return;
+    }
     judgeUids = null; // wird in renderTogetherJudgeList aus den aktuell aktiven Spielern gebildet
     saveGame();
     showTogetherReveal(t);
     renderTogetherJudgeList(t);
   };
+
+  // Hitster: Karte passt, wenn das Jahr zwischen linker und rechter Nachbarkarte liegt (gleiches Jahr zählt als richtig)
+  function slotOk(tl, slot, year){
+    if(typeof slot !== 'number' || slot < 0 || slot > tl.length) return false;
+    const left = slot > 0 ? tl[slot - 1].y : null;
+    const right = slot < tl.length ? tl[slot].y : null;
+    return (left === null || left <= year) && (right === null || year <= right);
+  }
+  function computeHitsterResults(t, map){
+    const year = t.yr.y;
+    const res = [];
+    players.forEach(p => {
+      if(p.removed || !p.uid) return;
+      const tl = hTimelines[p.uid] || (hTimelines[p.uid] = []);
+      const g = map[p.uid];
+      const slot = g && typeof g.slot === 'number' ? g.slot : null;
+      const ok = slot !== null && slotOk(tl, slot, year);
+      if(ok) tl.splice(slot, 0, { y: year, t: t.title, a: t.artist, r: remoteRound });
+      p.score = tl.length;
+      res.push({ uid: p.uid, name: p.name, ok: ok, slot: slot, cards: tl.length, at: g && g.at ? g.at : null });
+    });
+    return res;
+  }
+  function renderHitsterResults(list){
+    document.getElementById('togetherJudgeHint').textContent = 'Ergebnis dieser Runde:';
+    const started = MP() ? MP().getStartedAt() : null;
+    togetherJudgeList.innerHTML = (list || []).map(r => {
+      const label = r.ok ? '✓ richtig' : (r.slot === null ? '✗ nicht einsortiert' : '✗ falsch');
+      const time = (r.ok && r.at && started) ? ' · ' + fmtDur(r.at - started) : '';
+      return '<div class="mp-player"><span class="dot' + (r.ok ? ' ok' : '') + '"></span><span class="nm">' + escapeHtml(r.name) + '</span>' +
+        '<span style="font-size:12px; color:var(--slate);">' + label + time + ' · ' + r.cards + (r.cards === 1 ? ' Karte' : ' Karten') + '</span></div>';
+    }).join('');
+  }
 
   // Auflösung anzeigen (Cover, Titel, Fun Fact, Titel/Interpret unter dem Play-Knopf)
   function showTogetherReveal(t){
@@ -2667,7 +2988,7 @@
     togetherRevealPanel.style.display = 'block';
 
     togetherRevealTitle.textContent = t.title;
-    togetherRevealArtist.textContent = t.artist;
+    togetherRevealArtist.textContent = t.artist + (gameMode === 'hitster' && t.yr ? ' · ' + t.yr.y : '');
     if(t.cover){
       togetherRevealCover.src = t.cover; togetherRevealCover.style.display = 'block';
       togetherRevealCoverPlaceholder.style.display = 'none';
@@ -2776,7 +3097,7 @@
   }
 
   togetherNextRoundBtn.onclick = () => {
-    if(togetherJudgedCount < judgeTotal) return;
+    if(gameMode !== 'hitster' && togetherJudgedCount < judgeTotal) return;
     loadNextTrack();
   };
 
@@ -2798,7 +3119,7 @@
       row.innerHTML = `
         <div class="rank">${i+1}</div>
         <div class="fname">${escapeHtml(p.name)}${p.left ? ' <span style="color:var(--slate); font-size:0.75em;">(ausgestiegen)</span>' : ''}</div>
-        <div class="fpts">${p.score} Pkt.</div>
+        <div class="fpts">${p.score}${gameMode === 'hitster' ? (p.score === 1 ? ' Karte' : ' Karten') : ' Pkt.'}</div>
       `;
       finalList.appendChild(row);
     });
@@ -2838,6 +3159,13 @@
     endScreen.style.display = 'none';
     setupScreen.style.display = 'block';
   };
+
+  // Beim Start (ganz am Ende, wenn alle Variablen deklariert sind): gemerkte Playlists und gesicherte Songauswahl wiederherstellen
+  loadSavedPlaylists();
+  renderSavedPlaylists();
+  restoreTracks();
+  renderTracks();
+  checkStart();
 
 })();
 </script>
@@ -3202,11 +3530,31 @@
     resumeRound: function(){ watchStartedAt(); roundReady = Promise.resolve(); },
 
     // Spiel startet: alles zurücksetzen, Phase auf "playing"
-    onGameStart: async function(uids){
-      await Promise.all([roomRef('guesses').remove(), roomRef('results').remove(), roomRef('round').remove()]);
+    onGameStart: async function(uids, mode){
+      await Promise.all([roomRef('guesses').remove(), roomRef('results').remove(), roomRef('round').remove(), roomRef('timelines').remove()]);
       await Promise.all(uids.map(u => roomRef('players/' + u + '/score').set(0)));
-      await roomRef('meta/mode').set('together');
+      await roomRef('meta/mode').set(mode || 'together');
       await roomRef('meta/phase').set('playing');
+    },
+
+    // Hitster: Zeitleisten (nur bereits aufgedeckte Songs) und Kartenanzahl als Punktestand
+    onTimelines: async function(map){
+      const jobs = [];
+      Object.keys(map).forEach(uid => {
+        jobs.push(roomRef('timelines/' + uid).set(map[uid]));
+        jobs.push(roomRef('players/' + uid + '/score').set(map[uid].length));
+      });
+      await Promise.all(jobs);
+    },
+    // Hitster: Ergebnis dieser Runde je Spieler
+    onHitsterResults: async function(round, list){
+      const jobs = [];
+      list.forEach(r => {
+        jobs.push(roomRef('results/' + r.uid).set({ pts: r.ok ? 1 : 0, ok: !!r.ok, slot: r.slot === null || r.slot === undefined ? -1 : r.slot, round: round }));
+        jobs.push(roomRef('timelines/' + r.uid).set(r.timeline));
+        jobs.push(roomRef('players/' + r.uid + '/score').set(r.timeline.length));
+      });
+      await Promise.all(jobs);
     },
 
     // Neue Runde: alte Tipps/Ergebnisse weg, Handys zeigen das Tippfeld.
@@ -3251,7 +3599,7 @@
     // Neues Spiel / Abbruch: Raum zurück in die Lobby, Punkte auf 0
     onGameReset: async function(){
       unwatchStartedAt();
-      await Promise.all([roomRef('guesses').remove(), roomRef('results').remove(), roomRef('round').remove()]);
+      await Promise.all([roomRef('guesses').remove(), roomRef('results').remove(), roomRef('round').remove(), roomRef('timelines').remove()]);
       // Ausgestiegene sind für das nächste Spiel nicht mehr im Raum; alle anderen starten wieder bei 0.
       await Promise.all(hostPlayers.map(p => p.left ? roomRef('players/' + p.uid).remove() : roomRef('players/' + p.uid + '/score').set(0)));
       await roomRef('meta/phase').set('lobby');
@@ -3278,6 +3626,12 @@
   let pvMeta = null, pvRound = null, pvResult = null, pvPlayers = [], pvLastN, pvGuessRec = null, pvSending = false, pvGuessErr = '';
   const pvGuessHint = $('pvGuessHint');
   const pvEq = $('pvEq');
+  const pvHitPanel = $('pvHitPanel'), pvHitRevealPanel = $('pvHitRevealPanel');
+  const pvHitEq = $('pvHitEq'), pvHitNo = $('pvHitNo'), pvHitTotal = $('pvHitTotal'), pvHitHint = $('pvHitHint');
+  const pvTimelineEl = $('pvTimelineEl'), pvHitSend = $('pvHitSend'), pvHitMsg = $('pvHitMsg'), pvHitCards = $('pvHitCards');
+  const pvHitYear = $('pvHitYear'), pvHitCover = $('pvHitCover'), pvHitCoverPh = $('pvHitCoverPh'), pvHitTitle = $('pvHitTitle'), pvHitArtist = $('pvHitArtist');
+  const pvHitResult = $('pvHitResult'), pvTimelineAfter = $('pvTimelineAfter'), pvHitScoreList = $('pvHitScoreList');
+  let pvCards = [], pvSlot = null; // Hitster: eigene Zeitleiste und gewählte Stelle
 
   // 12,3 s  /  1:05 min
   function fmtDur(ms){
@@ -3291,14 +3645,14 @@
   function pvMsg(text, isErr){ pvJoinMsg.textContent = text || ''; pvJoinMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
 
   function showJoinPanel(message, isErr){
-    [pvLobbyPanel, pvGuessPanel, pvRevealPanel, pvFinalPanel].forEach(p => { p.style.display = 'none'; });
+    [pvLobbyPanel, pvGuessPanel, pvRevealPanel, pvFinalPanel, pvHitPanel, pvHitRevealPanel].forEach(p => { p.style.display = 'none'; });
     pvJoinPanel.style.display = 'block';
     pvOfflineBar.style.display = 'none';
     pvMsg(message, isErr);
   }
 
   function pvShow(panel){
-    [pvLobbyPanel, pvGuessPanel, pvRevealPanel, pvFinalPanel].forEach(p => { p.style.display = (p === panel) ? 'block' : 'none'; });
+    [pvLobbyPanel, pvGuessPanel, pvRevealPanel, pvFinalPanel, pvHitPanel, pvHitRevealPanel].forEach(p => { p.style.display = (p === panel) ? 'block' : 'none'; });
   }
 
   function guessMsg(text, isErr){ pvGuessMsg.textContent = text || ''; pvGuessMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
@@ -3310,12 +3664,98 @@
     ).join('');
   }
 
+  // Hitster: Zeitleiste als Karten mit Einfüge-Stellen dazwischen
+  function timelineHtml(cards, opts){
+    let h = '';
+    const n = cards.length;
+    for(let i = 0; i <= n; i++){
+      if(opts.interactive || opts.showSlots || opts.slot === i){
+        const sel = opts.slot === i;
+        h += '<button class="tl-slot' + (sel ? ' sel' : '') + '" data-slot="' + i + '"' + (opts.interactive ? '' : ' disabled') + '>' +
+          (sel ? (opts.placed ? '? Dein Tipp' : '? Hier einsortieren') : 'hier einsortieren') + '</button>';
+      }
+      if(i < n){
+        const c = cards[i];
+        h += '<div class="tl-card' + (opts.highlightRound != null && c.r === opts.highlightRound ? ' new' : '') + '"><span class="y">' + esc(c.y) + '</span><span class="m"><b>' + esc(c.t) + '</b><br>' + esc(c.a) + '</span></div>';
+      }
+    }
+    return h;
+  }
+  function hitMsg(text, isErr){ pvHitMsg.textContent = text || ''; pvHitMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
+
+  // Stelle in der Zeitleiste abschicken — einmalig und endgültig, mit Serverzeit
+  async function pvSendSlot(){
+    if(!db || !pvUid || !pvRound || pvSending || pvSlot === null) return;
+    if(pvRound.state !== 'guessing'){ pvGuessErr = 'Zu spät — der Host hat schon aufgedeckt.'; hitMsg(pvGuessErr, true); return; }
+    if(!pvRound.startedAt) return;
+    pvGuessErr = '';
+    pvSending = true;
+    pvHitSend.disabled = true;
+    hitMsg(pvOfflineBar.style.display === 'block' ? 'Offline — wird gesendet, sobald du wieder online bist …' : 'Sende …');
+    try{
+      await db.ref('rooms/' + JOIN_CODE + '/guesses/' + pvUid).set({ round: pvRound.n, slot: pvSlot, at: firebase.database.ServerValue.TIMESTAMP });
+    }catch(e){
+      console.warn(e);
+      pvGuessErr = /PERMISSION_DENIED/i.test((e && e.message) || '') ? 'Zu spät — der Host hat schon aufgedeckt (oder du hast schon einsortiert).' : friendlyError(e);
+    }finally{
+      pvSending = false;
+      pvRender();
+    }
+  }
+
   // Zeichnet die passende Ansicht aus dem aktuellen Zustand (Lobby / Tippen / Auflösung / Endstand).
   function pvRender(){
     if(!pvMeta) return;
     const me = pvPlayers.find(p => p.uid === pvUid);
     const myScore = me ? me.score : 0;
     const phase = pvMeta.phase;
+
+    // ===== Hitster =====
+    if(phase === 'playing' && pvMeta.mode === 'hitster' && pvRound){
+      if(pvRound.state === 'guessing'){
+        const rec = (pvGuessRec && pvGuessRec.round === pvRound.n && typeof pvGuessRec.slot === 'number') ? pvGuessRec : null;
+        const started = !!pvRound.startedAt;
+        pvHitNo.textContent = pvRound.n;
+        pvHitTotal.textContent = pvRound.total;
+        pvHitCards.textContent = pvCards.length;
+        pvHitEq.classList.toggle('spin', started);
+        if(rec){
+          pvTimelineEl.innerHTML = timelineHtml(pvCards, { slot: rec.slot, placed: true, interactive: false });
+          pvHitSend.disabled = true; pvHitSend.textContent = 'Einsortiert ✓';
+          const d = (rec.at && pvRound.startedAt) ? fmtDur(rec.at - pvRound.startedAt) : null;
+          pvHitHint.textContent = 'Dein Tipp ist abgegeben und kann nicht mehr geändert werden. Warte, bis der Host aufdeckt …';
+          hitMsg('Einsortiert ✓' + (d ? ' — nach ' + d : ''));
+        }else{
+          if(pvSlot !== null && pvSlot > pvCards.length) pvSlot = null;
+          pvTimelineEl.innerHTML = timelineHtml(pvCards, { slot: pvSlot, interactive: started, showSlots: true });
+          pvHitSend.disabled = !started || pvSlot === null || pvSending;
+          pvHitSend.textContent = 'Einsortieren';
+          pvHitHint.textContent = started
+            ? 'Wo gehört der Song hin? Tippe auf die Stelle in deiner Zeitleiste (älter oben, neuer unten) und bestätige.'
+            : 'Warte, bis der Host den Song startet …';
+          if(pvGuessErr) hitMsg(pvGuessErr, true); else if(!pvSending) hitMsg('');
+        }
+        pvShow(pvHitPanel);
+        return;
+      }
+      if(pvRound.state === 'reveal' && pvRound.reveal){
+        const rv = pvRound.reveal;
+        pvHitYear.textContent = rv.year || '—';
+        pvHitTitle.textContent = rv.title || '';
+        pvHitArtist.textContent = rv.artist || '';
+        if(rv.cover){ pvHitCover.src = rv.cover; pvHitCover.style.display = 'block'; pvHitCoverPh.style.display = 'none'; }
+        else { pvHitCover.style.display = 'none'; pvHitCoverPh.style.display = 'flex'; }
+        const res = (pvResult && pvResult.round === pvRound.n) ? pvResult : null;
+        pvHitResult.innerHTML = res
+          ? (res.ok ? '<span style="color:var(--gold); font-weight:600;">Richtig!</span> Die Karte ist in deiner Zeitleiste.'
+                    : '<span style="color:var(--coral); font-weight:600;">' + (res.slot < 0 ? 'Nicht einsortiert.' : 'Leider falsch.') + '</span> Keine Karte diesmal.')
+          : 'Wird ausgewertet …';
+        pvTimelineAfter.innerHTML = timelineHtml(pvCards, { interactive: false, highlightRound: pvRound.n });
+        pvHitScoreList.innerHTML = scoreRows(pvPlayers);
+        pvShow(pvHitRevealPanel);
+        return;
+      }
+    }
 
     if(phase === 'finished'){
       pvFinalList.innerHTML = scoreRows(pvPlayers);
@@ -3408,7 +3848,7 @@
     const guessRef = db.ref(base + '/guesses/' + pvUid);
     const infoRef = db.ref('.info/connected');
 
-    pvMeta = null; pvRound = null; pvResult = null; pvPlayers = []; pvLastN = undefined; pvGuessRec = null; pvSending = false; pvGuessErr = '';
+    pvMeta = null; pvRound = null; pvResult = null; pvPlayers = []; pvLastN = undefined; pvGuessRec = null; pvSending = false; pvGuessErr = ''; pvCards = []; pvSlot = null;
     pvMyName.textContent = name;
     pvJoinPanel.style.display = 'none';
     pvLobbyPanel.style.display = 'block';
@@ -3462,6 +3902,7 @@
       const n = pvRound ? pvRound.n : null;
       if(n !== pvLastN){
         pvLastN = n;
+        pvSlot = null;
         pvGuessTitle.value = ''; pvGuessArtist.value = ''; pvGuessErr = ''; guessMsg('');
       }
       pvRender();
@@ -3469,6 +3910,14 @@
 
     // Eigener Tipp (nur der Besitzer darf ihn lesen) — auch nach einem Neuladen der Seite wieder da.
     const guessCb = guessRef.on('value', s => { pvGuessRec = s.val(); pvRender(); });
+
+    // Hitster: eigene Zeitleiste (vom Host geschrieben)
+    const timelineRef = db.ref(base + '/timelines/' + pvUid);
+    const timelineCb = timelineRef.on('value', s => {
+      const v = s.val();
+      pvCards = Array.isArray(v) ? v.filter(Boolean) : (v ? Object.keys(v).sort((a, b) => a - b).map(k => v[k]) : []);
+      pvRender();
+    });
 
     const resultCb = resultRef.on('value', s => { pvResult = s.val(); pvRender(); });
 
@@ -3483,6 +3932,7 @@
       metaRef.off('value', metaCb);
       roundRef.off('value', roundCb);
       guessRef.off('value', guessCb);
+      timelineRef.off('value', timelineCb);
       resultRef.off('value', resultCb);
       connRef.onDisconnect().cancel().catch(() => {});
       pvDetach = null;
@@ -3510,6 +3960,7 @@
         await Promise.all([pRef.child('name').set(name), pRef.child('connected').set(true), pRef.child('left').remove()]);
       }else{
         if(meta.phase !== 'lobby' && meta.phase !== 'playing') throw new Error('Das Spiel ist vorbei — Beitritt jetzt nicht mehr möglich.');
+        if(meta.phase === 'playing' && meta.mode === 'hitster') throw new Error('Hitster läuft schon — Beitritt jetzt nicht mehr möglich.');
         await Promise.all([
           pRef.child('name').set(name),
           pRef.child('connected').set(true),
@@ -3554,6 +4005,13 @@
     pvLeaveBtn.addEventListener('click', pvLeave);
     document.querySelectorAll('.pv-leave').forEach(b => b.addEventListener('click', pvLeave));
     pvGuessBtn.addEventListener('click', pvSendGuess);
+    pvHitSend.addEventListener('click', pvSendSlot);
+    pvTimelineEl.addEventListener('click', e => {
+      const b = e.target.closest('.tl-slot');
+      if(!b || b.disabled) return;
+      pvSlot = parseInt(b.getAttribute('data-slot'), 10);
+      pvRender();
+    });
     pvNameInput.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); pvJoin(); } });
 
     // War dieses Gerät schon im Raum (z. B. Seite neu geladen), direkt wieder in die Lobby.
