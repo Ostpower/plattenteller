@@ -700,7 +700,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-11.2';
+  const APP_VERSION = '2026-10-11.3';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -1770,46 +1770,97 @@
     }
   };
 
-  // MusicBrainz: freie Musikdatenbank — hat Erstveröffentlichung und Herkunftsland des Interpreten
+  // MusicBrainz: freie Musikdatenbank — hat Erstveröffentlichung und Herkunftsland des Interpreten.
+  // Bester Weg: über die ISRC (die Spotify mitliefert) — die bezeichnet genau diese Aufnahme. Ohne ISRC: Textsuche.
+  async function mbJson(url){
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if(!res.ok){ const e = new Error('MusicBrainz antwortet mit HTTP ' + res.status); e.status = res.status; throw e; }
+    return res.json();
+  }
+  // Besten Treffer wählen: bevorzugt mit Erstveröffentlichungs-Datum, keine Live-Aufnahme, das früheste Datum
+  function pickBestRecording(recs){
+    const good = recs.filter(r => r.score == null || r.score >= 80);
+    const base = good.length ? good : recs;
+    const dated = base.filter(r => r['first-release-date']);
+    const pool = dated.length ? dated : base;
+    const looksLive = r => /live|konzert|concert/i.test(r.disambiguation || '') || /^\d{4}-\d{2}-\d{2}:/.test(r.releases && r.releases[0] ? (r.releases[0].title || '') : '');
+    const clean = pool.filter(r => !looksLive(r));
+    const use = clean.length ? clean : pool;
+    return use.slice().sort((a, b) => (a['first-release-date'] || '9999').localeCompare(b['first-release-date'] || '9999'))[0] || null;
+  }
+
   document.getElementById('debugMbBtn').onclick = async () => {
     debugReport = ''; debugCopyBtn.style.display = 'none';
-    let title = '', artist = '';
+    let title = '', artist = '', isrc = '', spYear = null;
     const ref = parseSpotifyRef(debugInput.value);
     debugOut.innerHTML = '<div class="empty-note">Suche in MusicBrainz …</div>';
     try{
-      if(ref && ref.type === 'track'){
-        if(!accessToken || !(await ensureFreshToken())) throw new Error('Für Spotify-Links bitte zuerst verbinden — oder leer lassen (erster Song im Stapel).');
-        const t = await spotifyApiJson('https://api.spotify.com/v1/tracks/' + ref.id, '');
-        title = t.name || ''; artist = t.artists && t.artists[0] ? t.artists[0].name : '';
+      let spTrack = null;
+      let spId = ref && ref.type === 'track' ? ref.id : (!debugInput.value.trim() && tracks[0] && String(tracks[0].id).startsWith('sp_') ? String(tracks[0].id).slice(3) : '');
+      if(spId){
+        if(!accessToken || !(await ensureFreshToken())) throw new Error('Bitte zuerst mit Spotify verbinden.');
+        spTrack = await spotifyApiJson('https://api.spotify.com/v1/tracks/' + spId, '');
+      }
+      if(spTrack){
+        title = spTrack.name || ''; artist = spTrack.artists && spTrack.artists[0] ? spTrack.artists[0].name : '';
+        isrc = spTrack.external_ids && spTrack.external_ids.isrc ? spTrack.external_ids.isrc : '';
+        spYear = yearOf(spTrack);
       }else if(tracks[0]){
-        title = tracks[0].title; artist = String(tracks[0].artist).split(',')[0].trim();
+        title = tracks[0].title; artist = String(tracks[0].artist).split(',')[0].trim(); spYear = tracks[0].year || null;
       }
       if(!title || !artist) throw new Error('Kein Song gefunden — bitte erst Songs laden oder einen Track-Link einfügen.');
-      const q = 'recording:"' + title.replace(/"/g, '') + '" AND artist:"' + artist.replace(/"/g, '') + '"';
-      const res = await fetch('https://musicbrainz.org/ws/2/recording/?query=' + encodeURIComponent(q) + '&fmt=json&limit=5', { headers: { 'Accept': 'application/json' } });
-      if(!res.ok) throw new Error('MusicBrainz antwortet mit HTTP ' + res.status);
-      const data = await res.json();
-      const recs = data.recordings || [];
-      debugReport = 'MusicBrainz-Prüfung: ' + title + ' – ' + artist + '\n';
-      let html = '';
-      let artistInfo = null, artistRaw = null;
-      if(recs[0] && recs[0]['artist-credit'] && recs[0]['artist-credit'][0] && recs[0]['artist-credit'][0].artist){
-        await sleep(1100); // MusicBrainz erlaubt ca. 1 Anfrage pro Sekunde
-        const ar = await fetch('https://musicbrainz.org/ws/2/artist/' + recs[0]['artist-credit'][0].artist.id + '?fmt=json', { headers: { 'Accept': 'application/json' } });
-        if(ar.ok){ artistRaw = await ar.json(); artistInfo = artistRaw; }
+
+      let recs = [], via = '', note = '';
+      if(isrc){
+        try{
+          const d = await mbJson('https://musicbrainz.org/ws/2/isrc/' + encodeURIComponent(isrc) + '?inc=artist-credits&fmt=json');
+          recs = d.recordings || []; via = 'ISRC';
+        }catch(e){
+          note = 'ISRC-Abfrage: ' + e.message + ' — Textsuche als Ersatz. ';
+          await sleep(1100);
+        }
       }
-      const r = recs[0] || {};
-      html += dbgRows('Bester Treffer für „' + title + '“ – ' + artist, [
-        ['Treffer insgesamt', recs.length],
-        ['Übereinstimmung (Score)', r.score],
-        ['Titel laut MusicBrainz', r.title],
-        ['Erstveröffentlichung', r['first-release-date']],
-        ['Erstes Album/Release', r.releases && r.releases[0] ? r.releases[0].title : null],
-        ['Interpret-Herkunft (Land)', artistInfo ? artistInfo.country : null],
-        ['Interpret-Gebiet', artistInfo && artistInfo.area ? artistInfo.area.name : null],
-        ['Gegründet/geboren in', artistInfo && artistInfo['begin-area'] ? artistInfo['begin-area'].name : null]
-      ]);
-      showDebug(html, [['recording search', recs], ['artist', artistRaw]]);
+      if(!recs.length){
+        const q = 'recording:"' + title.replace(/"/g, '') + '" AND artist:"' + artist.replace(/"/g, '') + '"';
+        const data = await mbJson('https://musicbrainz.org/ws/2/recording/?query=' + encodeURIComponent(q) + '&fmt=json&limit=10');
+        recs = data.recordings || []; via = 'Textsuche';
+      }
+      let best = pickBestRecording(recs);
+      // Fehlt Erstveröffentlichung oder Interpret: die Aufnahme einzeln nachladen
+      if(best && best.id && (!best['first-release-date'] || !(best['artist-credit'] && best['artist-credit'][0]))){
+        try{
+          await sleep(1100);
+          const full = await mbJson('https://musicbrainz.org/ws/2/recording/' + best.id + '?inc=artist-credits&fmt=json');
+          best = Object.assign({}, best, { 'first-release-date': best['first-release-date'] || full['first-release-date'], 'artist-credit': best['artist-credit'] || full['artist-credit'] });
+        }catch(e){ note += 'Aufnahme nachladen: ' + e.message + '. '; }
+      }
+      let artistRaw = null;
+      if(best && best['artist-credit'] && best['artist-credit'][0] && best['artist-credit'][0].artist){
+        try{
+          await sleep(1100); // MusicBrainz erlaubt ca. 1 Anfrage pro Sekunde
+          artistRaw = await mbJson('https://musicbrainz.org/ws/2/artist/' + best['artist-credit'][0].artist.id + '?fmt=json');
+        }catch(e){ note += 'Interpret: ' + e.message + '. '; }
+      }
+      const mbDate = best ? best['first-release-date'] : null;
+      const mbYear = mbDate ? parseInt(String(mbDate).slice(0, 4), 10) : null;
+      let cmp = null;
+      if(mbYear && spYear) cmp = mbYear === spYear ? 'gleich (' + mbYear + ')' : 'Spotify ' + spYear + ', MusicBrainz ' + mbYear + ' (' + Math.abs(spYear - mbYear) + ' Jahre Unterschied)';
+      debugReport = 'MusicBrainz-Prüfung: ' + title + ' – ' + artist + '\n';
+      const html = dbgRows('„' + title + '“ – ' + artist, [
+        ['Gefunden über', via],
+        ['ISRC', isrc || null],
+        ['ISRC-Vorsilbe (Land der Registrierung)', isrc ? isrc.slice(0, 2) : null],
+        ['Jahr laut Spotify (Album)', spYear],
+        ['Erstveröffentlichung laut MusicBrainz', mbDate],
+        ['Vergleich', cmp],
+        ['Treffer / Score', recs.length + (best && best.score != null ? ' / ' + best.score : '')],
+        ['Titel laut MusicBrainz', best ? best.title : null],
+        ['Hinweis zur Aufnahme', best ? best.disambiguation : null],
+        ['Interpret-Herkunft (Land)', artistRaw ? artistRaw.country : null],
+        ['Interpret-Gebiet', artistRaw && artistRaw.area ? artistRaw.area.name : null],
+        ['Gegründet/geboren in', artistRaw && artistRaw['begin-area'] ? artistRaw['begin-area'].name : null]
+      ]) + (note ? '<div class="empty-note">' + escapeHtml(note) + '</div>' : '');
+      showDebug(html, [['gewählter Treffer', best], ['alle Treffer', recs], ['Interpret', artistRaw]]);
     }catch(err){
       debugOut.innerHTML = '<div class="empty-note" style="color:var(--coral);">Fehler: ' + escapeHtml(err.message) + (/Failed to fetch|NetworkError|Load failed/i.test(err.message) ? ' — wahrscheinlich blockiert der Browser die Abfrage (CORS) oder es gibt keine Verbindung.' : '') + '</div>';
       console.error('MusicBrainz:', err);
