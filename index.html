@@ -171,6 +171,14 @@
   .tl-slot.sel{height:48px; border-style:solid; border-color:var(--gold); background:rgba(61,220,151,0.12); color:var(--gold); font-weight:600; font-size:14px;}
   .tl-slot:disabled{opacity:0.45;}
   #pvHitSend{position:sticky; bottom:14px; z-index:3; box-shadow:0 0 0 6px var(--panel);}
+  .qz-btn{display:flex; align-items:center; gap:12px; width:100%; min-height:58px; padding:8px 16px; text-align:left; background:var(--groove); border:1px solid var(--line-2); border-radius:16px; color:var(--cream); font-size:16px; font-weight:600; line-height:1.3; margin-bottom:8px;}
+  .qz-btn .k{flex-shrink:0; width:28px; height:28px; border-radius:8px; background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--slate);}
+  .qz-btn.sel{border-color:var(--gold); background:rgba(61,220,151,0.12); color:var(--gold);}
+  .qz-btn.sel .k{background:var(--gold); color:var(--gold-ink);}
+  .qz-btn.good{border-color:var(--gold); background:rgba(61,220,151,0.18); color:var(--gold);}
+  .qz-btn.bad{border-color:var(--coral); background:rgba(255,107,107,0.12); color:var(--coral);}
+  .qz-btn:disabled{opacity:0.5;}
+  .qz-count{font-size:38px; font-weight:700; text-align:center; color:var(--gold); margin:10px 0 0; letter-spacing:-0.02em;}
   .hit-year{font-size:44px; font-weight:700; letter-spacing:-0.03em; color:var(--gold); line-height:1;}
   .dbg-h{font-size:12px; font-weight:600; color:var(--cream); margin:16px 0 4px;}
   .dbg-row{display:flex; justify-content:space-between; gap:14px; padding:7px 0; border-top:1px solid var(--line); font-size:13px;}
@@ -514,13 +522,28 @@
         <div class="pick-chip selected" data-mode="sequential">Reihenfolge</div>
         <div class="pick-chip" data-mode="together">Zusammen</div>
         <div class="pick-chip" data-mode="hitster">Hitster</div>
+        <div class="pick-chip" data-mode="quiz">Quiz</div>
       </div>
-      <p class="hint" id="modeHint" style="margin-top:-8px;">Reihenfolge: einer ist abwechselnd dran, mit Streak-Bonus &amp; Klau-Powerup. Zusammen: alle hören denselben Song und tippen parallel (eigenes Handy oder mündlich/Zettel — jede*r wird danach einzeln bewertet, kein Streak/Klau). Hitster: jede*r baut mit dem eigenen Handy eine Zeitleiste und sortiert die Songs nach Erscheinungsjahr ein — nur mit Raum (Handys); die meisten Karten gewinnen.</p>
+      <p class="hint" id="modeHint" style="margin-top:-8px;">Einer ist abwechselnd dran, mit Streak-Bonus &amp; Klau-Powerup. Läuft auf einem Gerät.</p>
+      <div id="quizSettings" style="display:none;">
+        <label>Frage im Quiz</label>
+        <div class="pick-group" id="quizKindChips">
+          <div class="pick-chip selected" data-kind="artist">Welche Band?</div>
+          <div class="pick-chip" data-kind="title">Welcher Titel?</div>
+          <div class="pick-chip" data-kind="mixed">Gemischt</div>
+        </div>
+        <label>Countdown, sobald alle geantwortet haben</label>
+        <div class="pick-group" id="quizCountdownChips">
+          <div class="pick-chip" data-sec="5">5 s</div>
+          <div class="pick-chip selected" data-sec="10">10 s</div>
+          <div class="pick-chip" data-sec="15">15 s</div>
+        </div>
+      </div>
     </div>
 
     <div class="panel" id="mpHostPanel">
       <h2>4. Mehrere Handys (Beta)</h2>
-      <p class="hint">Jeder spielt mit dem eigenen Handy: Raum erstellen, Code oder QR zeigen, Mitspieler treten bei und tippen auf ihrem Handy (Modus „Zusammen“). Der Host steuert die Musik und wertet aus.</p>
+      <p class="hint">Jeder spielt mit dem eigenen Handy: Raum erstellen, Code oder QR zeigen, Mitspieler treten bei und spielen auf ihrem Handy (Zusammen, Hitster oder Quiz). Der Host steuert die Musik.</p>
       <button class="btn-gold" id="mpCreateBtn">Raum erstellen</button>
       <div id="mpRoomBox" style="display:none;">
         <label>Raumcode</label>
@@ -605,6 +628,7 @@
 
       <div class="mp-msg err" id="mpSyncMsg"></div>
       <div class="guess-panel" id="togetherGuessPanel" style="display:none;">
+        <div id="quizStatusLine" style="display:none; font-size:16px; font-weight:600; color:var(--gold); margin-bottom:12px;"></div>
         <p class="hint" id="togetherGuessHint" style="margin-bottom:14px;">Jede*r trägt hier seinen Tipp ein (eigenes Handy — Bildschirm den anderen nicht zeigen — oder mündlich/auf Zettel raten und eine Person überträgt es). Danach gemeinsam aufdecken.</p>
         <div id="togetherGuessList"></div>
         <button class="btn-line btn-block" id="togetherRevealBtn" style="margin-top:6px;">Aufdecken</button>
@@ -726,6 +750,35 @@
     <button class="btn-ghost btn-block pv-leave" style="margin-top:10px; font-size:12.5px;">Spiel verlassen</button>
   </div>
 
+  <div class="panel" id="pvQuizPanel" style="display:none;">
+    <div class="eq eq-sm" id="pvQuizEq" aria-hidden="true"><span class="bar" style="height:37px;animation-delay:-0.10s"></span><span class="bar" style="height:52px;animation-delay:-0.50s"></span><span class="bar" style="height:27px;animation-delay:-0.90s"></span><span class="bar" style="height:44px;animation-delay:-0.30s"></span><span class="bar" style="height:34px;animation-delay:-0.70s"></span><span class="bar" style="height:52px;animation-delay:-0.20s"></span><span class="bar" style="height:23px;animation-delay:-0.80s"></span><span class="bar" style="height:47px;animation-delay:-0.40s"></span><span class="bar" style="height:39px;animation-delay:-1.00s"></span><span class="bar" style="height:52px;animation-delay:-0.60s"></span><span class="bar" style="height:29px;animation-delay:-0.15s"></span><span class="bar" style="height:43px;animation-delay:-0.75s"></span><span class="bar" style="height:52px;animation-delay:-0.35s"></span><span class="bar" style="height:26px;animation-delay:-0.95s"></span><span class="bar" style="height:40px;animation-delay:-0.25s"></span></div>
+    <h2>Song <span id="pvQuizNo" style="color:var(--gold);"></span> <span style="color:var(--slate); font-size:0.7em;">von <span id="pvQuizTotal"></span></span></h2>
+    <p class="hint" id="pvQuizQ" style="font-size:15px; color:var(--cream); margin-bottom:6px;"></p>
+    <p class="hint" id="pvQuizHint">Warte, bis der Host den Song startet …</p>
+    <div id="pvQuizAnswers"></div>
+    <div class="qz-count" id="pvQuizCountdown"></div>
+    <div class="mp-msg" id="pvQuizMsg"></div>
+    <div style="font-size:12px; color:var(--slate); margin-top:10px;">Dein Punktestand: <span id="pvQuizScore" style="color:var(--gold);">0</span></div>
+    <button class="btn-ghost btn-block pv-leave" style="margin-top:14px; font-size:12.5px;">Spiel verlassen</button>
+  </div>
+
+  <div class="panel" id="pvQuizRevealPanel" style="display:none;">
+    <div id="pvQuizResult" style="font-size:18px; font-weight:600; margin-bottom:12px;"></div>
+    <div id="pvQuizAfter"></div>
+    <div class="reveal-card" style="margin-top:6px;">
+      <img id="pvQuizCover" src="" alt="" style="display:none;">
+      <div id="pvQuizCoverPh" class="placeholder-cover" style="width:64px;height:64px;">♪</div>
+      <div>
+        <div class="rt" id="pvQuizTitle"></div>
+        <div class="ra" id="pvQuizArtist"></div>
+      </div>
+    </div>
+    <label style="margin-top:14px;">Rangliste</label>
+    <div id="pvQuizScoreList"></div>
+    <p class="hint" style="margin:10px 0 0;">Warte auf den nächsten Song…</p>
+    <button class="btn-ghost btn-block pv-leave" style="margin-top:10px; font-size:12.5px;">Spiel verlassen</button>
+  </div>
+
   <div class="panel" id="pvFinalPanel" style="display:none;">
     <h2>Spiel vorbei!</h2>
     <div id="pvFinalList"></div>
@@ -751,7 +804,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-11.5';
+  const APP_VERSION = '2026-10-11.6';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -2229,6 +2282,16 @@
         hint.textContent = 'Hitster mit ' + remoteCount + ' Handy-Spielern. ' + (open ? open + ' Songs noch ohne geprüftes Jahr (wird beim Start automatisch geprüft). ' : '') +
           el + ' Songs mit sicherem Jahr · jede*r bekommt zuerst eine Startkarte, der Rest sind die Runden' + (open ? ' (Anzahl steht nach der Prüfung fest)' : ': ' + Math.max(0, el - remoteCount) + ' Runden') + '.';
       }
+    }else if(chosenMode === 'quiz'){
+      startGameBtn.disabled = !(remoteCount >= 1 && tracks.length >= 4);
+      hint.style.display = 'block';
+      if(remoteCount < 1){
+        hint.textContent = 'Quiz braucht einen Raum mit Handys — oben bei „Mehrere Handys“ einen Raum erstellen und Mitspieler beitreten lassen.';
+      }else{
+        const a = quizDistinctArtists();
+        hint.textContent = 'Quiz mit ' + remoteCount + ' Handy-Spielern: ' + tracks.length + ' Songs = ' + tracks.length + ' Runden.' +
+          (quizKindChoice !== 'title' && a < 4 ? ' Für „Welche Band?“ braucht es mindestens 4 verschiedene Interpreten (aktuell ' + a + ').' : '');
+      }
     }else if(remoteCount >= 1){
       hint.style.display = 'block';
       hint.textContent = 'Das Spiel startet mit den ' + remoteCount + ' Handy-Spielern aus dem Raum (Modus „Zusammen“). Spieler aus der lokalen Liste oben werden dabei nicht verwendet.';
@@ -2250,6 +2313,15 @@
   let judgeUids = null;        // wer in DIESER Runde bewertet wird (Stand beim Aufdecken)
   let judgeTotal = 0;          // Anzahl der Bewertungszeilen dieser Runde
   let judgeRowApi = {};        // uid -> Funktion, die die Zeile bewertet (für Automatik/Wiederherstellung)
+  let quizKindChoice = 'artist';   // Quiz: 'artist' | 'title' | 'mixed'
+  let quizCountdownSec = 10;
+  let quizKindNow = 'artist';      // Fragetyp der laufenden Runde
+  let quizOptions = [];            // 4 Antworttexte in angezeigter Reihenfolge
+  let quizCorrect = 0;             // Index der richtigen Antwort (nur der Host kennt ihn bis zum Aufdecken)
+  let quizCountdownMs = 10000;
+  let quizCountdownStarted = false;
+  let quizDeadlineAt = null, quizTimer = null, quizTick = null, quizUnwatch = null;
+  const QUIZ_CD = () => (typeof window.PT_QUIZ_COUNTDOWN_MS === 'number') ? window.PT_QUIZ_COUNTDOWN_MS : quizCountdownSec * 1000;
   let hTimelines = {};         // Hitster: uid -> Zeitleiste [{ y, t, a, r }] (Jahr, Titel, Interpret, Runde)
   let hResults = [];           // Hitster: Ergebnisse der aktuellen Runde (für Anzeige/Wiederherstellung)
   let gameStage = 'guessing';  // 'guessing' | 'reveal' | 'end' — für die Wiederherstellung nach einem Neuladen
@@ -2264,6 +2336,106 @@
     if(sec < 60) return sec.toFixed(1).replace('.', ',') + ' s';
     const m = Math.floor(sec / 60), r = Math.floor(sec % 60);
     return m + ':' + (r < 10 ? '0' : '') + r + ' min';
+  }
+
+  // ---------- QUIZ ----------
+  function firstArtist(t){ return String(t.artist).split(',')[0].trim(); }
+  function quizTitleOf(t){ return (typeof cleanTitleForSearch === 'function' ? cleanTitleForSearch(t.title) : t.title) || t.title; }
+  function quizDistinctArtists(){ return new Set(tracks.map(t => normalize(firstArtist(t)))).size; }
+  function quizDistinctTitles(){ return new Set(tracks.map(t => normalize(quizTitleOf(t)))).size; }
+  // Vier Antworten: die richtige plus drei aus demselben Stapel (also gleiches Genre), bevorzugt aus ähnlicher Zeit
+  function buildQuizRound(t){
+    let kind = quizKindChoice;
+    if(kind === 'mixed') kind = Math.random() < 0.5 ? 'artist' : 'title';
+    const correctText = kind === 'artist' ? firstArtist(t) : quizTitleOf(t);
+    const ty = (t.yr && t.yr.y) || t.year || null;
+    const seen = new Set([normalize(correctText)]);
+    const cand = [];
+    tracks.forEach(o => {
+      if(o === t) return;
+      const text = kind === 'artist' ? firstArtist(o) : quizTitleOf(o);
+      const key = normalize(text);
+      if(!key || seen.has(key)) return;
+      if(kind === 'artist' && normalize(String(t.artist)).includes(key)) return; // kein Mit-Interpret als falsche Antwort
+      seen.add(key);
+      const oy = (o.yr && o.yr.y) || o.year || null;
+      cand.push({ text: text, score: (ty && oy ? Math.abs(ty - oy) : 12) + Math.random() * 6 });
+    });
+    cand.sort((a, b) => a.score - b.score);
+    const opts = shuffle([correctText].concat(cand.slice(0, 3).map(c => c.text)));
+    return { kind: kind, options: opts, correct: opts.indexOf(correctText) };
+  }
+  function clearQuizTimers(){
+    if(quizTimer){ clearTimeout(quizTimer); quizTimer = null; }
+    if(quizTick){ clearInterval(quizTick); quizTick = null; }
+    if(quizUnwatch){ quizUnwatch(); quizUnwatch = null; }
+    quizDeadlineAt = null;
+    const el = document.getElementById('quizStatusLine');
+    if(el) el.style.display = 'none';
+  }
+  function updateQuizStatus(){
+    const el = document.getElementById('quizStatusLine');
+    if(!el || quizDeadlineAt === null || !MP()) return;
+    const sec = Math.max(0, Math.ceil((quizDeadlineAt - MP().getServerNow()) / 1000));
+    el.style.display = 'block';
+    el.textContent = 'Alle haben geantwortet — Auflösung in ' + sec + ' s';
+  }
+  // Der Host ist die Uhr: Sobald Firebase die Startzeit des Countdowns meldet, wird zum Ablauf automatisch aufgedeckt.
+  // (Die Regeln lassen nach dem Ablauf ohnehin keine Antworten mehr zu.)
+  function watchQuizDeadline(){
+    if(!MP()) return;
+    const roundTag = remoteRound;
+    quizUnwatch = MP().watchDeadline(ds => {
+      if(ds == null || remoteRound !== roundTag || gameStage !== 'guessing') return;
+      quizCountdownStarted = true;
+      quizDeadlineAt = ds + quizCountdownMs;
+      if(quizTimer) clearTimeout(quizTimer);
+      quizTimer = setTimeout(() => { if(gameStage === 'guessing' && remoteRound === roundTag) togetherRevealBtn.onclick(); }, Math.max(0, quizDeadlineAt - MP().getServerNow()) + 250);
+      updateQuizStatus();
+      if(!quizTick) quizTick = setInterval(updateQuizStatus, 250);
+    });
+  }
+  // Haben alle (verbundenen, nicht ausgestiegenen) Spieler geantwortet, startet der Countdown — einmal pro Runde.
+  function maybeStartQuizCountdown(){
+    if(gameMode !== 'quiz' || !remoteGame || !MP() || gameStage !== 'guessing' || quizCountdownStarted) return;
+    const req = players.filter(p => !p.removed && !p.left && p.connected !== false);
+    if(!req.length || !req.every(p => lastGuessMap[p.uid])) return;
+    quizCountdownStarted = true;
+    MP().startCountdown().catch(e => { quizCountdownStarted = false; syncError(e); });
+  }
+  function computeQuizResults(map){
+    const started = MP() ? MP().getStartedAt() : null;
+    const rows = [];
+    players.forEach(p => {
+      if(p.removed || !p.uid) return;
+      const g = map[p.uid];
+      const choice = g && typeof g.choice === 'number' ? g.choice : null;
+      const ok = choice !== null && choice === quizCorrect;
+      const ms = (g && g.at && started) ? g.at - started : null;
+      rows.push({ uid: p.uid, name: p.name, choice: choice, ok: ok, ms: ms, bonus: false, pts: 0, answer: choice !== null ? (quizOptions[choice] || '') : '', score: 0 });
+    });
+    // Schnellster Bonus: nur wenn mindestens zwei richtig lagen; es zählt die Zeit der letzten (endgültigen) Antwort
+    const right = rows.filter(r => r.ok && r.ms !== null);
+    const best = right.length >= 2 ? Math.min.apply(null, right.map(r => r.ms)) : null;
+    rows.forEach(r => {
+      r.bonus = best !== null && r.ok && r.ms === best;
+      r.pts = (r.ok ? 1 : 0) + (r.bonus ? 1 : 0);
+      const p = players.find(x => x.uid === r.uid);
+      p.score += r.pts;
+      r.score = p.score;
+    });
+    return rows;
+  }
+  function renderQuizResults(list){
+    document.getElementById('togetherJudgeHint').textContent = 'Richtig war: „' + (quizOptions[quizCorrect] || '') + '“ — Ergebnis dieser Runde:';
+    togetherJudgeList.innerHTML = (list || []).map(r => {
+      let label;
+      if(r.choice === null) label = 'keine Antwort';
+      else if(r.ok) label = '✓ richtig +' + r.pts + (r.bonus ? ' (schnellste)' : '') + (r.ms !== null ? ' · ' + fmtDur(r.ms) : '');
+      else label = '✗ ' + r.answer;
+      return '<div class="mp-player"><span class="dot' + (r.ok ? ' ok' : '') + '"></span><span class="nm">' + escapeHtml(r.name) + '</span>' +
+        '<span style="font-size:12px; color:var(--slate);">' + escapeHtml(label) + ' · ' + r.score + ' Pkt.</span></div>';
+    }).join('');
   }
 
   // Songs mit sicherem Jahr (nur die kommen im Hitster-Modus vor)
@@ -2285,7 +2457,8 @@
         localPlayers: (localPlayersBackup || []).map(p => ({ name: p.name })),
         remoteRound: remoteRound, stage: gameStage, songStartSent: songStartSent,
         guesses: togetherGuesses, judged: judgedMap, judgeUids: judgeUids,
-        gameMode: gameMode, hTimelines: hTimelines, hResults: hResults
+        gameMode: gameMode, hTimelines: hTimelines, hResults: hResults,
+        quizOptions: quizOptions, quizCorrect: quizCorrect, quizKindNow: quizKindNow, quizCountdownMs: quizCountdownMs
       }));
       saveError = '';
     }catch(e){ saveError = (e && e.message) || String(e); /* Speicher voll/gesperrt: Spiel läuft trotzdem, nur ohne Wiederherstellung */ }
@@ -2377,7 +2550,8 @@
     localPlayersBackup = (saved.localPlayers || []).map(p => ({ name: p.name, score: 0, streak: 0, stealAvailable: false, stealUsed: false }));
     players = saved.players.map(p => ({ name: p.name, uid: p.uid, score: p.score || 0, streak: 0, stealAvailable: false, stealUsed: false }));
     remoteGame = true;
-    gameMode = saved.gameMode === 'hitster' ? 'hitster' : 'together';
+    gameMode = (saved.gameMode === 'hitster' || saved.gameMode === 'quiz') ? saved.gameMode : 'together';
+    quizOptions = saved.quizOptions || []; quizCorrect = saved.quizCorrect || 0; quizKindNow = saved.quizKindNow || 'artist'; quizCountdownMs = saved.quizCountdownMs || QUIZ_CD();
     hTimelines = saved.hTimelines || {};
     hResults = saved.hResults || [];
     remoteRound = saved.remoteRound || 0;
@@ -2406,6 +2580,7 @@
       mp.resumeRound();
       showTogetherReveal(t);
       if(gameMode === 'hitster'){ renderHitsterResults(hResults); togetherNextRoundBtn.disabled = false; }
+      else if(gameMode === 'quiz'){ renderQuizResults(hResults); togetherNextRoundBtn.disabled = false; }
       else renderTogetherJudgeList(t, judgedMap);
     }else{
       // Tippphase: Song neu laden (pausiert). Runde und Tipps bleiben in Firebase unverändert.
@@ -2427,12 +2602,33 @@
     mpSyncMsg.textContent = 'Handy-Sync: ' + ((e && e.message) || e) + ' — Spiel läuft lokal weiter.';
   }
   function MP(){ return (window.PTMP && window.PTMP.active()) ? window.PTMP : null; } // function-Deklaration: wird von checkStart() schon früh genutzt
+  document.querySelectorAll('#quizKindChips .pick-chip').forEach(chip => {
+    chip.onclick = () => {
+      quizKindChoice = chip.getAttribute('data-kind');
+      document.querySelectorAll('#quizKindChips .pick-chip').forEach(c => c.classList.toggle('selected', c === chip));
+      checkStart();
+    };
+  });
+  document.querySelectorAll('#quizCountdownChips .pick-chip').forEach(chip => {
+    chip.onclick = () => {
+      quizCountdownSec = parseInt(chip.getAttribute('data-sec'), 10) || 10;
+      document.querySelectorAll('#quizCountdownChips .pick-chip').forEach(c => c.classList.toggle('selected', c === chip));
+    };
+  });
+  const MODE_HINTS = {
+    sequential: 'Reihenfolge: einer ist abwechselnd dran, mit Streak-Bonus & Klau-Powerup. Läuft auf einem Gerät.',
+    together: 'Zusammen: alle hören denselben Song und tippen Titel und Interpret parallel (eigenes Handy oder mündlich/Zettel) — jede*r wird danach einzeln bewertet, kein Streak/Klau.',
+    hitster: 'Hitster: jede*r baut mit dem eigenen Handy eine Zeitleiste und sortiert die Songs nach Erscheinungsjahr ein. Die meisten Karten gewinnen. Nur mit Raum (Handys).',
+    quiz: 'Quiz: vier Antworten auf dem Handy (Band oder Titel). Antwort wählen und ändern, bis alle geantwortet haben — dann läuft ein Countdown, danach ist Schluss. Richtig = 1 Punkt, die schnellste richtige Antwort +1. Nur mit Raum (Handys).'
+  };
   const modeChipsEl = document.getElementById('modeChips');
   [...modeChipsEl.children].forEach(chip => {
     chip.onclick = () => {
       gameMode = chip.getAttribute('data-mode');
       chosenMode = gameMode;
       [...modeChipsEl.children].forEach(c => c.classList.toggle('selected', c === chip));
+      document.getElementById('quizSettings').style.display = chosenMode === 'quiz' ? 'block' : 'none';
+      document.getElementById('modeHint').textContent = MODE_HINTS[chosenMode] || '';
       if(chosenMode === 'hitster' && tracks.some(t => !t.yr)) runYearResolver(); // Jahre schon mal im Hintergrund prüfen
       checkStart();
     };
@@ -2515,6 +2711,27 @@
     if(wakeLockWanted && document.visibilityState === 'visible') requestWakeLock();
   });
 
+  // Quiz starten: jeder Song ist eine Runde
+  function startQuiz(roomPlayers){
+    const mp = MP();
+    remoteGame = true;
+    localPlayersBackup = players;
+    players = roomPlayers.map(rp => ({ name: rp.name, uid: rp.uid, score: 0, streak: 0, stealAvailable: false, stealUsed: false }));
+    gameMode = 'quiz';
+    remoteRound = 0; judgedMap = {}; judgeUids = null; hResults = []; hTimelines = {};
+    quizCountdownMs = QUIZ_CD();
+    deck = shuffle(tracks.map((_, i) => i));
+    totalDeckSize = deck.length;
+    currentPlayerIdx = 0;
+    mp.onGameStart(players.map(p => p.uid), 'quiz').catch(syncError);
+    setupScreen.style.display = 'none';
+    gameScreen.style.display = 'block';
+    endScreen.style.display = 'none';
+    requestWakeLock();
+    loadNextTrack();
+    renderScoreboard();
+  }
+
   // Hitster starten: jede*r bekommt eine Startkarte, der Rest des Stapels sind die Runden
   function startHitster(roomPlayers, eligible){
     const mp = MP();
@@ -2562,6 +2779,18 @@
         return;
       }
       startHitster(roomPlayers, eligible);
+      return;
+    }
+    if(chosenMode === 'quiz'){
+      const roomPlayers = mp ? mp.getRoomPlayers() : [];
+      const hint = document.getElementById('remoteStartHint');
+      if(roomPlayers.length < 1){ checkStart(); return; }
+      let problem = '';
+      if(tracks.length < 4) problem = 'Für das Quiz braucht es mindestens 4 Songs.';
+      else if(quizKindChoice !== 'title' && quizDistinctArtists() < 4) problem = 'Für „Welche Band?“ braucht es mindestens 4 verschiedene Interpreten (aktuell ' + quizDistinctArtists() + ').';
+      else if(quizKindChoice !== 'artist' && quizDistinctTitles() < 4) problem = 'Für „Welcher Titel?“ braucht es mindestens 4 verschiedene Titel.';
+      if(problem){ hint.style.display = 'block'; hint.textContent = problem; return; }
+      startQuiz(roomPlayers);
       return;
     }
     remoteGame = !!(mp && mp.getRoomPlayers().length >= 1);
@@ -2625,7 +2854,9 @@
     brandDot.classList.remove('is-playing');
     nowStatus.textContent = 'Bereit — Play antippen';
 
-    if(gameMode === 'together' || gameMode === 'hitster'){
+    if(gameMode === 'together' || gameMode === 'hitster' || gameMode === 'quiz'){
+      clearQuizTimers();
+      quizCountdownStarted = false;
       guessPanel.style.display = 'none';
       revealPanel.style.display = 'none';
       stealBox.style.display = 'none';
@@ -2637,10 +2868,20 @@
         remoteRound = songNumber;
         MP().resumeRound();
         togetherRevealBtn.disabled = false;
+        if(gameMode === 'quiz') watchQuizDeadline();
       }else if(remoteGame && MP()){
         remoteRound = songNumber;
         togetherRevealBtn.disabled = true; // erst nach dem Sync der neuen Runde freigeben
-        MP().onRound(songNumber, totalDeckSize).then(() => { togetherRevealBtn.disabled = false; }).catch(e => { togetherRevealBtn.disabled = false; syncError(e); });
+        let extra = null;
+        if(gameMode === 'quiz'){
+          const q = buildQuizRound(t);
+          quizKindNow = q.kind; quizOptions = q.options; quizCorrect = q.correct; quizCountdownMs = QUIZ_CD();
+          extra = { kind: quizKindNow, options: quizOptions, countdownMs: quizCountdownMs };
+        }
+        MP().onRound(songNumber, totalDeckSize, extra).then(() => {
+          togetherRevealBtn.disabled = false;
+          if(gameMode === 'quiz') watchQuizDeadline(); // erst jetzt: sonst könnte der Countdown der Vorrunde noch im Speicher stehen
+        }).catch(e => { togetherRevealBtn.disabled = false; syncError(e); });
       }else{
         togetherRevealBtn.disabled = false;
       }
@@ -2846,19 +3087,20 @@
     const done = active.filter(p => lastGuessMap[p.uid]).length;
     const started = MP() ? MP().getStartedAt() : null;
     togetherGuessList.innerHTML =
-      '<div class="hint" style="margin-bottom:8px;">' + done + ' von ' + active.length + (gameMode === 'hitster' ? ' haben einsortiert' : ' haben getippt') + '</div>' +
+      '<div class="hint" style="margin-bottom:8px;">' + done + ' von ' + active.length + (gameMode === 'hitster' ? ' haben einsortiert' : (gameMode === 'quiz' ? ' haben geantwortet' : ' haben getippt')) + '</div>' +
       shown.map(p => {
         const g = lastGuessMap[p.uid];
         const online = !p.left && p.connected !== false;
         let label;
         if(p.left) label = 'ausgestiegen';
-        else if(g) label = (gameMode === 'hitster' ? '✓ einsortiert' : '✓ getippt') + ((g.at && started) ? ' · ' + fmtDur(g.at - started) : '');
+        else if(g) label = (gameMode === 'hitster' ? '✓ einsortiert' : (gameMode === 'quiz' ? '✓ geantwortet' : '✓ getippt')) + ((g.at && started) ? ' · ' + fmtDur(g.at - started) : '');
         else if(p.connected === false) label = 'offline';
-        else label = gameMode === 'hitster' ? 'überlegt …' : 'tippt …';
+        else label = (gameMode === 'hitster' || gameMode === 'quiz') ? 'überlegt …' : 'tippt …';
         return '<div class="mp-player"><span class="dot' + (online ? ' ok' : '') + '"></span><span class="nm">' + escapeHtml(p.name) + '</span>' +
           '<span style="font-family:var(--mono); font-size:11.5px; color:var(--slate);">' + label + '</span>' +
           '<button class="mp-kick" data-uid="' + escapeHtml(p.uid || '') + '" title="Aus dem Spiel entfernen">×</button></div>';
       }).join('');
+    maybeStartQuizCountdown();
   }
   // Spieler im laufenden Spiel entfernen (z. B. wenn jemand dauerhaft offline ist)
   togetherGuessList.addEventListener('click', e => {
@@ -2882,7 +3124,9 @@
     if(remoteGame){
       hintEl.textContent = gameMode === 'hitster'
         ? 'Alle sortieren den Song auf ihrem Handy in ihre Zeitleiste ein. Wenn alle fertig sind, hier aufdecken.'
-        : 'Alle tippen auf dem eigenen Handy. Wenn genug getippt haben, hier aufdecken.';
+        : (gameMode === 'quiz'
+          ? 'Alle antworten auf dem eigenen Handy (die Antwort bleibt änderbar). Sobald alle geantwortet haben, läuft der Countdown und die Runde wird automatisch aufgedeckt — oder hier selbst aufdecken.'
+          : 'Alle tippen auf dem eigenen Handy. Wenn genug getippt haben, hier aufdecken.');
       renderRemoteGuessStatus({});
       unsubGuesses = MP() ? MP().onGuessesChange(renderRemoteGuessStatus) : null;
       return;
@@ -2908,13 +3152,14 @@
     if(t && t.source === 'deezer'){ deezerAudio.pause(); } else if(controller){ controller.pause(); }
 
     remoteRoundOpen = false;
+    clearQuizTimers();
     let revealMap = {};
     if(remoteGame && MP()){
       // Erst sperren + Lösung veröffentlichen, dann die (nun endgültigen) Tipps lesen.
       togetherRevealBtn.disabled = true;
       try{
         if(unsubGuesses){ unsubGuesses(); unsubGuesses = null; }
-        const map = await MP().reveal({ title: t.title, artist: t.artist, cover: t.cover || '', funFact: t.funFact || '', year: (t.yr && t.yr.y) || null });
+        const map = await MP().reveal({ title: t.title, artist: t.artist, cover: t.cover || '', funFact: t.funFact || '', year: (t.yr && t.yr.y) || null, correct: gameMode === 'quiz' ? quizCorrect : null, kind: gameMode === 'quiz' ? quizKindNow : null });
         revealMap = map;
         togetherGuesses = players.map(p => map[p.uid] || { title: '', artist: '' });
       }catch(e){
@@ -2941,6 +3186,17 @@
       renderHitsterResults(hResults);
       togetherNextRoundBtn.disabled = false;
       if(MP()) MP().onHitsterResults(remoteRound, hResults.map(r => ({ uid: r.uid, ok: r.ok, slot: r.slot, timeline: hTimelines[r.uid] || [] }))).catch(syncError);
+      return;
+    }
+    if(gameMode === 'quiz'){
+      // Automatisch auswerten: richtig = 1 Punkt, die schnellste richtige Antwort +1
+      hResults = computeQuizResults(revealMap);
+      renderScoreboard();
+      saveGame();
+      showTogetherReveal(t);
+      renderQuizResults(hResults);
+      togetherNextRoundBtn.disabled = false;
+      if(MP()) MP().onQuizResults(remoteRound, hResults.map(r => ({ uid: r.uid, ok: r.ok, choice: r.choice, bonus: r.bonus, pts: r.pts, ms: r.ms, score: r.score }))).catch(syncError);
       return;
     }
     judgeUids = null; // wird in renderTogetherJudgeList aus den aktuell aktiven Spielern gebildet
@@ -3097,7 +3353,7 @@
   }
 
   togetherNextRoundBtn.onclick = () => {
-    if(gameMode !== 'hitster' && togetherJudgedCount < judgeTotal) return;
+    if(gameMode !== 'hitster' && gameMode !== 'quiz' && togetherJudgedCount < judgeTotal) return;
     loadNextTrack();
   };
 
@@ -3313,6 +3569,8 @@
   function detachHost(){
     if(hostPlayersRef && hostPlayersCb) hostPlayersRef.off('value', hostPlayersCb);
     if(hostInfoRef && hostInfoCb) hostInfoRef.off('value', hostInfoCb);
+    if(offsetRef && offsetCb) offsetRef.off('value', offsetCb);
+    offsetRef = offsetCb = null;
     hostPlayersRef = hostPlayersCb = hostInfoRef = hostInfoCb = null;
     if(hostBeat){ clearInterval(hostBeat); hostBeat = null; }
     hostPlayers = [];
@@ -3341,6 +3599,8 @@
     // Host-Präsenz: Spieler sehen, wenn der Host kurz offline ist.
     const hc = db.ref('rooms/' + code + '/meta/hostConnected');
     hostInfoRef = db.ref('.info/connected');
+    offsetRef = db.ref('.info/serverTimeOffset');
+    offsetCb = offsetRef.on('value', s => { serverOffset = s.val() || 0; });
     hostInfoCb = hostInfoRef.on('value', s => {
       if(s.val() === true){ hc.onDisconnect().set(false); hc.set(true); }
     });
@@ -3504,6 +3764,7 @@
 
   // Startzeit des Songs (Serverzeit) der aktuellen Runde — wird vom Host mitgelesen, um Tipp-Zeiten zu berechnen.
   let hostStartedAt = null, startedRef = null, startedCb = null, roundReady = Promise.resolve();
+  let serverOffset = 0, offsetRef = null, offsetCb = null; // Differenz Host-Uhr ↔ Firebase-Serverzeit
   function watchStartedAt(){
     if(startedRef && startedCb) startedRef.off('value', startedCb);
     hostStartedAt = null;
@@ -3559,13 +3820,31 @@
 
     // Neue Runde: alte Tipps/Ergebnisse weg, Handys zeigen das Tippfeld.
     // Titel/Interpret des Songs stehen NICHT in der Datenbank, bis aufgedeckt wird.
-    onRound: function(n, total){
+    onRound: function(n, total, extra){
       watchStartedAt();
       roundReady = (async () => {
         await Promise.all([roomRef('guesses').remove(), roomRef('results').remove()]);
-        await roomRef('round').set({ n: n, total: total, state: 'guessing' });
+        await roomRef('round').set(Object.assign({ n: n, total: total, state: 'guessing' }, extra || {}));
       })();
       return roundReady;
+    },
+
+    // Quiz: Countdown starten (Firebase-Serverzeit) und beobachten; die Uhr des Hosts wird mit dem Server abgeglichen.
+    startCountdown: async function(){ await roomRef('round/deadlineStart').set(firebase.database.ServerValue.TIMESTAMP); },
+    watchDeadline: function(cb){
+      const ref = roomRef('round/deadlineStart');
+      const fn = ref.on('value', s => cb(s.val()));
+      return () => ref.off('value', fn);
+    },
+    getServerNow: () => Date.now() + serverOffset,
+    // Quiz: Ergebnis je Spieler (Antwort, richtig, Schnellster-Bonus, Punkte)
+    onQuizResults: async function(round, list){
+      const jobs = [];
+      list.forEach(r => {
+        jobs.push(roomRef('results/' + r.uid).set({ pts: r.pts, ok: !!r.ok, choice: r.choice === null || r.choice === undefined ? -1 : r.choice, bonus: !!r.bonus, round: round }));
+        jobs.push(roomRef('players/' + r.uid + '/score').set(r.score));
+      });
+      await Promise.all(jobs);
     },
 
     // Song läuft zum ersten Mal: Serverzeit als Startzeit. Erst danach können die Handys ihren Tipp senden.
@@ -3632,6 +3911,13 @@
   const pvHitYear = $('pvHitYear'), pvHitCover = $('pvHitCover'), pvHitCoverPh = $('pvHitCoverPh'), pvHitTitle = $('pvHitTitle'), pvHitArtist = $('pvHitArtist');
   const pvHitResult = $('pvHitResult'), pvTimelineAfter = $('pvTimelineAfter'), pvHitScoreList = $('pvHitScoreList');
   let pvCards = [], pvSlot = null; // Hitster: eigene Zeitleiste und gewählte Stelle
+  // Quiz
+  const pvQuizPanel = $('pvQuizPanel'), pvQuizRevealPanel = $('pvQuizRevealPanel');
+  const pvQuizEq = $('pvQuizEq'), pvQuizNo = $('pvQuizNo'), pvQuizTotal = $('pvQuizTotal'), pvQuizQ = $('pvQuizQ'), pvQuizHint = $('pvQuizHint');
+  const pvQuizAnswers = $('pvQuizAnswers'), pvQuizCountdown = $('pvQuizCountdown'), pvQuizMsg = $('pvQuizMsg'), pvQuizScore = $('pvQuizScore');
+  const pvQuizResult = $('pvQuizResult'), pvQuizAfter = $('pvQuizAfter'), pvQuizCover = $('pvQuizCover'), pvQuizCoverPh = $('pvQuizCoverPh');
+  const pvQuizTitle = $('pvQuizTitle'), pvQuizArtist = $('pvQuizArtist'), pvQuizScoreList = $('pvQuizScoreList');
+  let pvOffset = 0, pvQuizBusy = false, pvQuizWanted = null, pvQuizSig = '', pvWasLocked = false;
 
   // 12,3 s  /  1:05 min
   function fmtDur(ms){
@@ -3645,14 +3931,14 @@
   function pvMsg(text, isErr){ pvJoinMsg.textContent = text || ''; pvJoinMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
 
   function showJoinPanel(message, isErr){
-    [pvLobbyPanel, pvGuessPanel, pvRevealPanel, pvFinalPanel, pvHitPanel, pvHitRevealPanel].forEach(p => { p.style.display = 'none'; });
+    [pvLobbyPanel, pvGuessPanel, pvRevealPanel, pvFinalPanel, pvHitPanel, pvHitRevealPanel, pvQuizPanel, pvQuizRevealPanel].forEach(p => { p.style.display = 'none'; });
     pvJoinPanel.style.display = 'block';
     pvOfflineBar.style.display = 'none';
     pvMsg(message, isErr);
   }
 
   function pvShow(panel){
-    [pvLobbyPanel, pvGuessPanel, pvRevealPanel, pvFinalPanel, pvHitPanel, pvHitRevealPanel].forEach(p => { p.style.display = (p === panel) ? 'block' : 'none'; });
+    [pvLobbyPanel, pvGuessPanel, pvRevealPanel, pvFinalPanel, pvHitPanel, pvHitRevealPanel, pvQuizPanel, pvQuizRevealPanel].forEach(p => { p.style.display = (p === panel) ? 'block' : 'none'; });
   }
 
   function guessMsg(text, isErr){ pvGuessMsg.textContent = text || ''; pvGuessMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
@@ -3703,12 +3989,99 @@
     }
   }
 
+  // ---------- Quiz ----------
+  function pvNow(){ return Date.now() + pvOffset; }
+  function quizLocked(){
+    return !!(pvRound && pvRound.deadlineStart && pvRound.countdownMs && pvNow() >= pvRound.deadlineStart + pvRound.countdownMs);
+  }
+  function quizMsg(text, isErr){ pvQuizMsg.textContent = text || ''; pvQuizMsg.className = 'mp-msg' + (isErr ? ' err' : ''); }
+  // Countdown-Anzeige (läuft im Takt, ohne die Antwort-Knöpfe neu zu zeichnen)
+  function pvTickCountdown(){
+    if(!pvRound || pvRound.state !== 'guessing' || !pvRound.deadlineStart || !pvRound.countdownMs){ pvQuizCountdown.textContent = ''; pvWasLocked = false; return; }
+    const left = pvRound.deadlineStart + pvRound.countdownMs - pvNow();
+    if(left > 0){ pvQuizCountdown.textContent = 'Noch ' + Math.ceil(left / 1000) + ' s'; }
+    else{
+      pvQuizCountdown.textContent = 'Zeit abgelaufen';
+      if(!pvWasLocked){ pvWasLocked = true; pvRender(); } // Knöpfe sperren
+    }
+  }
+  // Antwort wählen oder ändern — jede Änderung wird gesendet; die letzte zählt (Serverzeit)
+  async function pvQuizSend(choice){
+    if(!db || !pvUid || !pvRound) return;
+    if(pvRound.state !== 'guessing' || !pvRound.startedAt || quizLocked()) return;
+    pvQuizWanted = choice;
+    if(pvQuizBusy) return; // läuft schon ein Versand: er holt den neuesten Wunsch nach
+    pvQuizBusy = true;
+    pvGuessErr = '';
+    try{
+      while(pvQuizWanted !== null){
+        const c = pvQuizWanted; pvQuizWanted = null;
+        if(pvGuessRec && pvGuessRec.round === pvRound.n && pvGuessRec.choice === c) continue;
+        await db.ref('rooms/' + JOIN_CODE + '/guesses/' + pvUid).set({ round: pvRound.n, choice: c, at: firebase.database.ServerValue.TIMESTAMP });
+      }
+    }catch(e){
+      console.warn(e);
+      pvGuessErr = /PERMISSION_DENIED/i.test((e && e.message) || '') ? 'Zu spät — die Zeit ist abgelaufen.' : friendlyError(e);
+    }finally{
+      pvQuizBusy = false;
+      pvRender();
+    }
+  }
+
   // Zeichnet die passende Ansicht aus dem aktuellen Zustand (Lobby / Tippen / Auflösung / Endstand).
   function pvRender(){
     if(!pvMeta) return;
     const me = pvPlayers.find(p => p.uid === pvUid);
     const myScore = me ? me.score : 0;
     const phase = pvMeta.phase;
+
+    // ===== Quiz =====
+    if(phase === 'playing' && pvMeta.mode === 'quiz' && pvRound){
+      const opts = pvRound.options || [];
+      if(pvRound.state === 'guessing'){
+        const started = !!pvRound.startedAt;
+        const locked = quizLocked();
+        const mine = (pvGuessRec && pvGuessRec.round === pvRound.n && typeof pvGuessRec.choice === 'number') ? pvGuessRec.choice : null;
+        pvQuizNo.textContent = pvRound.n;
+        pvQuizTotal.textContent = pvRound.total;
+        pvQuizScore.textContent = myScore;
+        pvQuizEq.classList.toggle('spin', started);
+        pvQuizQ.textContent = pvRound.kind === 'title' ? 'Welcher Titel läuft?' : 'Welche Band / welcher Interpret ist das?';
+        const sig = JSON.stringify([pvRound.n, opts, mine, started, locked]);
+        if(sig !== pvQuizSig){ // nur neu zeichnen, wenn sich etwas ändert (sonst gehen Antipper verloren)
+          pvQuizSig = sig;
+          pvQuizAnswers.innerHTML = opts.map((o, i) =>
+            '<button class="qz-btn' + (mine === i ? ' sel' : '') + '" data-choice="' + i + '"' + ((!started || locked) ? ' disabled' : '') + '><span class="k">' + 'ABCD'.charAt(i) + '</span><span>' + esc(o) + '</span></button>'
+          ).join('');
+        }
+        pvQuizHint.textContent = !started ? 'Warte, bis der Host den Song startet …'
+          : locked ? 'Die Zeit ist abgelaufen — deine Antwort ist endgültig.'
+          : mine === null ? 'Tippe auf deine Antwort. Du kannst sie ändern, bis alle geantwortet haben.'
+          : 'Antwort eingecheckt ✓ — du kannst sie noch ändern, bis der Countdown abläuft.';
+        if(pvGuessErr) quizMsg(pvGuessErr, true); else quizMsg('');
+        pvTickCountdown();
+        pvShow(pvQuizPanel);
+        return;
+      }
+      if(pvRound.state === 'reveal' && pvRound.reveal){
+        const rv = pvRound.reveal;
+        const res = (pvResult && pvResult.round === pvRound.n) ? pvResult : null;
+        pvQuizResult.innerHTML = res
+          ? (res.ok ? '<span style="color:var(--gold);">Richtig!</span> ' + (res.bonus ? '+2 Punkte (schnellste richtige Antwort)' : '+1 Punkt')
+                    : '<span style="color:var(--coral);">' + (res.choice < 0 ? 'Keine Antwort.' : 'Leider falsch.') + '</span> Diesmal kein Punkt.')
+          : 'Wird ausgewertet …';
+        pvQuizAfter.innerHTML = opts.map((o, i) =>
+          '<div class="qz-btn' + (i === rv.correct ? ' good' : (res && res.choice === i ? ' bad' : '')) + '"><span class="k">' + 'ABCD'.charAt(i) + '</span><span>' + esc(o) + '</span></div>'
+        ).join('');
+        pvQuizTitle.textContent = rv.title || '';
+        pvQuizArtist.textContent = (rv.artist || '') + (rv.year ? ' · ' + rv.year : '');
+        if(rv.cover){ pvQuizCover.src = rv.cover; pvQuizCover.style.display = 'block'; pvQuizCoverPh.style.display = 'none'; }
+        else { pvQuizCover.style.display = 'none'; pvQuizCoverPh.style.display = 'flex'; }
+        pvQuizScoreList.innerHTML = scoreRows(pvPlayers);
+        pvShow(pvQuizRevealPanel);
+        return;
+      }
+    }
 
     // ===== Hitster =====
     if(phase === 'playing' && pvMeta.mode === 'hitster' && pvRound){
@@ -3848,7 +4221,7 @@
     const guessRef = db.ref(base + '/guesses/' + pvUid);
     const infoRef = db.ref('.info/connected');
 
-    pvMeta = null; pvRound = null; pvResult = null; pvPlayers = []; pvLastN = undefined; pvGuessRec = null; pvSending = false; pvGuessErr = ''; pvCards = []; pvSlot = null;
+    pvMeta = null; pvRound = null; pvResult = null; pvPlayers = []; pvLastN = undefined; pvGuessRec = null; pvSending = false; pvGuessErr = ''; pvCards = []; pvSlot = null; pvQuizSig = ''; pvWasLocked = false; pvQuizBusy = false; pvQuizWanted = null;
     pvMyName.textContent = name;
     pvJoinPanel.style.display = 'none';
     pvLobbyPanel.style.display = 'block';
@@ -3902,7 +4275,7 @@
       const n = pvRound ? pvRound.n : null;
       if(n !== pvLastN){
         pvLastN = n;
-        pvSlot = null;
+        pvSlot = null; pvQuizSig = ''; pvWasLocked = false;
         pvGuessTitle.value = ''; pvGuessArtist.value = ''; pvGuessErr = ''; guessMsg('');
       }
       pvRender();
@@ -3910,6 +4283,11 @@
 
     // Eigener Tipp (nur der Besitzer darf ihn lesen) — auch nach einem Neuladen der Seite wieder da.
     const guessCb = guessRef.on('value', s => { pvGuessRec = s.val(); pvRender(); });
+
+    // Quiz: Serverzeit-Abgleich und Countdown-Takt
+    const offRef = db.ref('.info/serverTimeOffset');
+    const offCb = offRef.on('value', s => { pvOffset = s.val() || 0; });
+    const cdTimer = setInterval(pvTickCountdown, 250);
 
     // Hitster: eigene Zeitleiste (vom Host geschrieben)
     const timelineRef = db.ref(base + '/timelines/' + pvUid);
@@ -3933,6 +4311,8 @@
       roundRef.off('value', roundCb);
       guessRef.off('value', guessCb);
       timelineRef.off('value', timelineCb);
+      offRef.off('value', offCb);
+      clearInterval(cdTimer);
       resultRef.off('value', resultCb);
       connRef.onDisconnect().cancel().catch(() => {});
       pvDetach = null;
@@ -4006,6 +4386,11 @@
     document.querySelectorAll('.pv-leave').forEach(b => b.addEventListener('click', pvLeave));
     pvGuessBtn.addEventListener('click', pvSendGuess);
     pvHitSend.addEventListener('click', pvSendSlot);
+    pvQuizAnswers.addEventListener('click', e => {
+      const b = e.target.closest('.qz-btn');
+      if(!b || b.disabled) return;
+      pvQuizSend(parseInt(b.getAttribute('data-choice'), 10));
+    });
     pvTimelineEl.addEventListener('click', e => {
       const b = e.target.closest('.tl-slot');
       if(!b || b.disabled) return;
