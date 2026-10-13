@@ -52,7 +52,7 @@ Da: Titel, Interpret, Album, Albumtyp, Album-Datum, Länge, Explicit, ISRC, Trac
 Playlist-Inhalte nur für **eigene** Playlists. MusicBrainz funktioniert direkt im Browser (CORS ok). Das Album-Datum kann bei Live/Bonus/Compilation falsch sein.
 
 ## Tests (`tests/`)
-14 Testreihen, 581 Prüfungen, `cd tests && npm install && npm test` (ca. 2,5 Minuten). **Im Chat nie im Hintergrund starten und mit `timeout 280` aufrufen**
+15 Testreihen, 602 Prüfungen, `cd tests && npm install && npm test` (ca. 2,5 Minuten). **Im Chat nie im Hintergrund starten und mit `timeout 280` aufrufen**
 (ein Befehl darf höchstens 300 s laufen, Hintergrundprozesse werden beendet); beim Entwickeln einzelne Reihen mit `node smokeN.js`. jsdom ist auf 30.1.2 festgeschrieben.
 Neue Funktion → neue Reihe (Vorlage `smoke12.js`) und Eintrag in `run-all.js` und `tests/README.md`. Echtes Spotify/MusicBrainz/Firebase-Live/Handys testet Marcel selbst — das immer klar sagen.
 
