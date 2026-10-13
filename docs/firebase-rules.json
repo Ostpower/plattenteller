@@ -1,0 +1,69 @@
+{
+  "rules": {
+    "rooms": {
+      "$room": {
+        ".write": "auth != null && !newData.exists() && data.child('meta').child('hostUid').val() === auth.uid",
+        "meta": {
+          ".read": "auth != null",
+          ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() === auth.uid) || data.child('hostUid').val() === auth.uid)"
+        },
+        "players": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && (root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid || ($uid === auth.uid && !newData.exists()))",
+            "name": {
+              ".write": "auth != null && $uid === auth.uid",
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 18"
+            },
+            "connected": {
+              ".write": "auth != null && $uid === auth.uid && root.child('rooms').child($room).child('meta').exists()",
+              ".validate": "newData.isBoolean()"
+            },
+            "joinedAt": {
+              ".write": "auth != null && $uid === auth.uid && !data.exists()",
+              ".validate": "newData.isNumber()"
+            },
+            "score": {
+              ".write": "auth != null && $uid === auth.uid && !data.exists() && newData.val() === 0",
+              ".validate": "newData.isNumber()"
+            },
+            "left": {
+              ".write": "auth != null && $uid === auth.uid && root.child('rooms').child($room).child('meta').exists()",
+              ".validate": "newData.isBoolean()"
+            }
+          }
+        },
+        "round": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid"
+        },
+        "guesses": {
+          ".read": "auth != null && root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid",
+          ".write": "auth != null && root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && $uid === auth.uid",
+            ".write": "auth != null && $uid === auth.uid && root.child('rooms').child($room).child('round').child('state').val() === 'guessing' && root.child('rooms').child($room).child('round').child('startedAt').exists() && (!data.exists() || root.child('rooms').child($room).child('meta').child('mode').val() === 'quiz') && (!root.child('rooms').child($room).child('round').child('deadlineStart').exists() || now <= root.child('rooms').child($room).child('round').child('deadlineStart').val() + root.child('rooms').child($room).child('round').child('countdownMs').val())",
+            ".validate": "newData.hasChildren(['round', 'at']) && newData.child('round').val() === root.child('rooms').child($room).child('round').child('n').val() && newData.child('at').val() === now && ((newData.child('slot').isNumber() && newData.child('slot').val() >= 0 && newData.child('slot').val() <= 500 && !newData.hasChild('title') && !newData.hasChild('artist') && !newData.hasChild('choice')) || (newData.child('choice').isNumber() && newData.child('choice').val() >= 0 && newData.child('choice').val() <= 3 && !newData.hasChild('title') && !newData.hasChild('artist') && !newData.hasChild('slot')) || (newData.hasChildren(['title', 'artist']) && !newData.hasChild('slot') && !newData.hasChild('choice') && newData.child('title').isString() && newData.child('title').val().length <= 80 && newData.child('artist').isString() && newData.child('artist').val().length <= 80 && (newData.child('title').val().length > 0 || newData.child('artist').val().length > 0)))"
+          }
+        },
+        "results": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid"
+        },
+        "timelines": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid"
+        }
+      }
+    },
+    "hostRooms": {
+      "$uid": {
+        ".read": "auth != null && $uid === auth.uid",
+        ".write": "auth != null && $uid === auth.uid",
+        "$code": {
+          ".validate": "newData.isNumber()"
+        }
+      }
+    }
+  }
+}
