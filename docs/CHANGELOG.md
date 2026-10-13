@@ -140,6 +140,24 @@ Behoben mit **v2026-10-13.1** (siehe unten).
   Max-2-Regel gelten nur noch für die Suche (Genre/Freitext) und beim manuellen Hinzufügen.
 - Meldung nennt Zahl, entfernte Doppelte und übersprungene Songs. Neue Testreihe `tests/smoke11.js`.
 
+## v2026-10-13.2 (nachgetragen)
+
+- Die Version war im Code und in der Übergabe vermerkt, aber ohne CHANGELOG-Eintrag. Inhalt laut Code/Übergabe: **Runden pro Spiel** (10/20/30/50/Alle, alle Modi, im Browser gemerkt)
+  und der Hinweis im Startbereich „Quiz mit N Handy-Spielern: X Songs → Y Runden“. (Nachträglich rekonstruiert — bitte prüfen.)
+
+## v2026-10-13.3
+
+- **Gemeinsamer Jahre-Speicher in Firebase** (`years/<ISRC>` → `{ y, s, t }`): ein einmal ermitteltes **sicheres** Erscheinungsjahr gilt jetzt auf allen Geräten sofort.
+  Ablauf je Song: lokaler Cache → Firebase (gebündelt, 20 Songs pro Schub, je ISRC nur eine Abfrage pro Sitzung) → MusicBrainz; nach einem sicheren MusicBrainz-Ergebnis
+  wird in Firebase geschrieben (ohne zu warten). Unsichere (⚠) Ergebnisse und Ergebnisse nach gescheiterter Originalsuche bleiben lokal.
+  Während der Prüfung zeigt die Statuszeile „· N aus dem gemeinsamen Speicher“.
+- Fällt Firebase aus (offline, hängt > 4 s, Regeln nicht veröffentlicht), läuft die Ermittlung unverändert über MusicBrainz; danach pausiert der Speicher 1–5 Minuten.
+- **Firebase-Regeln** (`docs/firebase-rules.json`): `years/$isrc` nur lesbar/schreibbar für angemeldete Geräte, **einmal schreiben, nie überschreiben oder löschen**,
+  ISRC `^[A-Z0-9]{12}$`, Jahr ganzzahlig 1900 bis aktuelles Jahr + 1, Quelle `mb`/`mb-orig`/`spotify`, Zeit = Serverzeit, keine weiteren Felder; die ganze Liste ist nicht auf einmal lesbar.
+  **Müssen in der Firebase Console veröffentlicht werden** (Realtime Database → Regeln).
+- Tests: neue Reihe `tests/smoke13.js`, `rules_test.js` um `years/` erweitert, Regel-Simulator kennt `matches()`, Firebase-Attrappe bildet `years/` nach.
+  `smoke10.js`: veralteten Hinweistext angepasst („→ N Runden“).
+
 ## Offen / als Nächstes geplant
 
 Siehe `ROADMAP.md`.

@@ -45,6 +45,17 @@ Realtime Database statt Firestore, weil Online-Status/Presence ("wer ist gerade 
     score   // vom Host vergeben, triggert Punktegutschrift
 ```
 
+Außerhalb der Räume (seit v2026-10-13.3), gemeinsam für alle Geräte:
+
+```
+/years/{ISRC}/        // ISRC: 12 Zeichen A–Z/0–9
+  y   // Erscheinungsjahr (ganzzahlig, 1900 bis aktuelles Jahr + 1)
+  s   // Quelle: "mb" | "mb-orig" | "spotify"
+  t   // Serverzeit des Eintrags
+```
+
+Nur sichere Jahre; angemeldete Geräte lesen einzelne Einträge und schreiben **einmal** (nie überschreiben, nie löschen). Keine Titel/Interpreten — nur ISRC als Schlüssel.
+
 **Wichtig:** Songtitel/Interpret des aktuellen Songs stehen nie in `/round`, solange `phase="playing"` — sonst könnte jemand mit offenen DevTools mitlesen. Erst beim Aufdecken schreibt der Host sie rein.
 
 ## Auth & Security Rules

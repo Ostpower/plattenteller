@@ -56,6 +56,14 @@ Kernstück ist die Auswahl-Logik in `runSearch()`:
   (frühestes Studio-Erscheinungsjahr desselben Titels vom selben Interpreten); sonst gilt das Jahr als **unsicher** (⚠) und der Song wird im Hitster-Modus nicht verwendet.
 - Ergebnis steht im Song als `yr = { y, src, unsure }`; Cache im Browser (`plattenteller_year_cache`), Schlüssel ISRC bzw. Titel+Interpret.
 - Die Entwickler-Ansicht „Song-Daten prüfen“ zeigt, welche Felder Spotify/MusicBrainz liefern.
+- **Gemeinsamer Speicher (v2026-10-13.3):** Firebase `years/<ISRC>` = `{ y, s, t }` (`s` = `mb` | `mb-orig` | `spotify`, `t` = Serverzeit). Reihenfolge in `resolveOne()`:
+  lokaler Cache → Firebase → MusicBrainz. `runYearResolver()` holt die Firebase-Treffer vorab gebündelt (20 Songs pro Schub, `prefetchSharedYears()`); `sharedAsked` verhindert
+  doppelte Abfragen derselben ISRC in einer Sitzung. Nur **sichere** Ergebnisse mit ISRC werden geschrieben (`put`, ohne zu warten) — nicht, wenn die Originalsuche fehlgeschlagen ist
+  (sonst würde ein Netzfehler ein schwächeres Jahr für alle festschreiben). Firebase-Treffer landen auch im lokalen Cache.
+- **Zwei Skripte, eine Brücke:** Ermittler und Firebase-Code sind getrennte IIFEs; das Firebase-Skript stellt `window.PT_YEARS_STORE = { getMany, put }` bereit. Fehlt es (Firebase nicht geladen)
+  oder schlägt etwas fehl, liefert es leer / tut nichts — **die Ermittlung darf nie blockieren** (Zeitlimit 4 s, `PT_YEARS_TIMEOUT_MS`; danach 60 s Pause, nach `PERMISSION_DENIED` beim Lesen 5 min).
+- **Regeln:** einmal schreiben, nie überschreiben/löschen. Eine falsche Eintragung korrigiert nur Marcel in der Console (Daten → `years/<ISRC>` löschen; lokal gemerkte Werte bleiben auf den Geräten,
+  bis der Browser-Cache geleert wird). Ungültige Einträge in der Datenbank werden vom Client ignoriert (`ysValid`).
 
 ## Mehrere Handys (Firebase)
 

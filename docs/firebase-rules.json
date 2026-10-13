@@ -64,6 +64,25 @@
           ".validate": "newData.isNumber()"
         }
       }
+    },
+    "years": {
+      "$isrc": {
+        ".read": "auth != null",
+        ".write": "auth != null && !data.exists() && newData.exists()",
+        ".validate": "$isrc.matches(/^[A-Z0-9]{12}$/) && newData.hasChildren(['y', 's', 't'])",
+        "y": {
+          ".validate": "newData.isNumber() && newData.val() >= 1900 && newData.val() % 1 === 0 && newData.val() <= 1971 + now / 31556952000"
+        },
+        "s": {
+          ".validate": "newData.isString() && (newData.val() === 'mb' || newData.val() === 'mb-orig' || newData.val() === 'spotify')"
+        },
+        "t": {
+          ".validate": "newData.isNumber() && newData.val() === now"
+        },
+        "$other": {
+          ".validate": "false"
+        }
+      }
     }
   }
 }

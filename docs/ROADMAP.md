@@ -1,6 +1,6 @@
 # Roadmap
 
-Geplant, aber noch nicht gebaut — Status vor Umsetzung jeweils neu verifizieren. Stand: 2026-10-13 (nach v2026-10-13.1).
+Geplant, aber noch nicht gebaut — Status vor Umsetzung jeweils neu verifizieren. Stand: 2026-10-13 (nach v2026-10-13.3).
 
 ## Offen
 
@@ -16,6 +16,7 @@ Geplant, aber noch nicht gebaut — Status vor Umsetzung jeweils neu verifiziere
 
 - Multi-Smartphone-Multiplayer über Firebase (Lobby, Tippen, Zeitmessung, Wiederherstellung, Offline, Aufräumen) — Technik in `firebase-multiplayer-plan.md`.
 - Playlist-Import übernimmt die ganze Playlist (v2026-10-13.1).
+- Gemeinsamer Jahre-Speicher in Firebase (`years/<ISRC>`, v2026-10-13.3).
 - Spielmodi „Hitster“ und „Quiz“. Neues Design (Equalizer statt Kassette). Playlists merken, Songauswahl sichern, Jahre ermitteln.
 
 ## Selbst-gehostete Backend-Option (shelved)
