@@ -538,6 +538,15 @@
           <div class="pick-chip" data-sec="15">15 s</div>
         </div>
       </div>
+      <label>Runden pro Spiel</label>
+      <div class="pick-group" id="roundsChips" style="margin-bottom:8px;">
+        <div class="pick-chip" data-rounds="10">10</div>
+        <div class="pick-chip" data-rounds="20">20</div>
+        <div class="pick-chip" data-rounds="30">30</div>
+        <div class="pick-chip" data-rounds="50">50</div>
+        <div class="pick-chip selected" data-rounds="all">Alle</div>
+      </div>
+      <p class="hint" id="roundsHint" style="margin-top:0;"></p>
     </div>
 
     <div class="panel" id="mpHostPanel">
@@ -803,7 +812,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-13.1';
+  const APP_VERSION = '2026-10-13.2';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -2079,10 +2088,12 @@
     dropUnsureBtn.style.display = unsure ? 'inline-block' : 'none';
   }
 
-  function runYearResolver(){
+  // target (optional): nur so lange prüfen, bis so viele Songs mit sicherem Jahr da sind (zufällige Reihenfolge)
+  function runYearResolver(target){
     if(yearRun) return yearRun.promise;
-    const todo = tracks.filter(t => !t.yr);
+    let todo = tracks.filter(t => !t.yr);
     if(!todo.length){ renderYearStatus(); return Promise.resolve(); }
+    if(target) todo = shuffle(todo);
     const run = { cancel: false };
     yearRun = run;
     yearsBtn.style.display = 'none';
@@ -2093,10 +2104,11 @@
       let done = 0, failed = 0;
       for(const t of todo){
         if(run.cancel) break;
+        if(target && hitsterEligible().length >= target) break;
         try{ await resolveOne(t); }
         catch(e){ failed++; console.warn('Jahr ermitteln:', t.title, e); }
         done++;
-        yearStatus.textContent = 'Jahre werden geprüft … ' + done + ' von ' + todo.length + (failed ? ' (' + failed + ' Fehler)' : '');
+        yearStatus.textContent = 'Jahre werden geprüft … ' + (target ? hitsterEligible().length + ' von ' + target + ' benötigten Songs mit sicherem Jahr' : done + ' von ' + todo.length) + (failed ? ' (' + failed + ' Fehler)' : '');
         if(done % 5 === 0){ saveYearCache(); saveTracks(); }
       }
       saveYearCache();
@@ -2259,6 +2271,7 @@
   playerInput.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); addPlayer(); }});
 
   function checkStart(){
+    updateRoundsHint();
     const mp = MP();
     const remoteCount = mp ? mp.getRoomPlayers().length : 0;
     startGameBtn.disabled = !((players.length >= 1 || remoteCount >= 1) && tracks.length >= 1);
@@ -2272,8 +2285,9 @@
       }else{
         const open = tracks.filter(t => !t.yr).length;
         const el = hitsterEligible().length;
-        hint.textContent = 'Hitster mit ' + remoteCount + ' Handy-Spielern. ' + (open ? open + ' Songs noch ohne geprüftes Jahr (wird beim Start automatisch geprüft). ' : '') +
-          el + ' Songs mit sicherem Jahr · jede*r bekommt zuerst eine Startkarte, der Rest sind die Runden' + (open ? ' (Anzahl steht nach der Prüfung fest)' : ': ' + Math.max(0, el - remoteCount) + ' Runden') + '.';
+        const rounds = Math.max(0, Math.min(roundLimit(), el - remoteCount));
+        hint.textContent = 'Hitster mit ' + remoteCount + ' Handy-Spielern. ' + (open ? open + ' Songs noch ohne geprüftes Jahr — beim Start werden nur so viele geprüft, wie die Runden brauchen (schon geprüfte sind gemerkt). ' : '') +
+          el + ' Songs mit sicherem Jahr · jede*r bekommt zuerst eine Startkarte, der Rest sind die Runden' + (open ? ' (' + (Number.isFinite(roundLimit()) ? 'höchstens ' + roundLimit() : 'alle') + ')' : ': ' + rounds + ' Runden') + '.';
       }
     }else if(chosenMode === 'quiz'){
       startGameBtn.disabled = !(remoteCount >= 1 && tracks.length >= 4);
@@ -2282,7 +2296,7 @@
         hint.textContent = 'Quiz braucht einen Raum mit Handys — oben bei „Mehrere Handys“ einen Raum erstellen und Mitspieler beitreten lassen.';
       }else{
         const a = quizDistinctArtists();
-        hint.textContent = 'Quiz mit ' + remoteCount + ' Handy-Spielern: ' + tracks.length + ' Songs = ' + tracks.length + ' Runden.' +
+        hint.textContent = 'Quiz mit ' + remoteCount + ' Handy-Spielern: ' + tracks.length + ' Songs → ' + Math.min(roundLimit(), tracks.length) + ' Runden.' +
           (quizKindChoice !== 'title' && a < 4 ? ' Für „Welche Band?“ braucht es mindestens 4 verschiedene Interpreten (aktuell ' + a + ').' : '');
       }
     }else if(remoteCount >= 1){
@@ -2306,6 +2320,17 @@
   let judgeUids = null;        // wer in DIESER Runde bewertet wird (Stand beim Aufdecken)
   let judgeTotal = 0;          // Anzahl der Bewertungszeilen dieser Runde
   let judgeRowApi = {};        // uid -> Funktion, die die Zeile bewertet (für Automatik/Wiederherstellung)
+  // Runden pro Spiel: 'all' oder eine Zahl (aus dem Stapel werden so viele Songs zufällig gespielt); wird im Browser gemerkt
+  const ROUNDS_KEY = 'plattenteller_rounds';
+  let roundsChoice = 'all';
+  try{ const r = localStorage.getItem(ROUNDS_KEY); if(r === 'all' || [10, 20, 30, 50].includes(parseInt(r, 10))) roundsChoice = r === 'all' ? 'all' : parseInt(r, 10); }catch(e){}
+  function roundLimit(){ return roundsChoice === 'all' ? Infinity : roundsChoice; }
+  function limitDeck(arr){ const L = roundLimit(); return L === Infinity ? arr : arr.slice(0, L); }
+  function updateRoundsHint(){
+    const el = document.getElementById('roundsHint'); if(!el) return;
+    const n = tracks.length, L = roundLimit();
+    el.textContent = !n ? '' : (L >= n ? 'Alle ' + n + (n === 1 ? ' Song wird' : ' Songs werden') + ' gespielt.' : L + ' von ' + n + ' Songs werden gespielt (zufällig gewählt).');
+  }
   let quizKindChoice = 'artist';   // Quiz: 'artist' | 'title' | 'mixed'
   let quizCountdownSec = 10;
   let quizKindNow = 'artist';      // Fragetyp der laufenden Runde
@@ -2430,6 +2455,9 @@
         '<span style="font-size:12px; color:var(--slate);">' + escapeHtml(label) + ' · ' + r.score + ' Pkt.</span></div>';
     }).join('');
   }
+
+  // So viele Songs mit sicherem Jahr braucht ein Hitster-Spiel: Startkarten (je Spieler) + gewählte Runden
+  function hitsterNeeded(playerCount){ return Math.min(tracks.length, playerCount + (Number.isFinite(roundLimit()) ? roundLimit() : tracks.length)); }
 
   // Songs mit sicherem Jahr (nur die kommen im Hitster-Modus vor)
   function hitsterEligible(){ return tracks.filter(t => t.yr && !t.yr.unsure && t.yr.y); }
@@ -2614,6 +2642,16 @@
     hitster: 'Hitster: jede*r baut mit dem eigenen Handy eine Zeitleiste und sortiert die Songs nach Erscheinungsjahr ein. Die meisten Karten gewinnen. Nur mit Raum (Handys).',
     quiz: 'Quiz: vier Antworten auf dem Handy (Band oder Titel). Antwort wählen und ändern, bis alle geantwortet haben — dann läuft ein Countdown, danach ist Schluss. Richtig = 1 Punkt, die schnellste richtige Antwort +1. Nur mit Raum (Handys).'
   };
+  document.querySelectorAll('#roundsChips .pick-chip').forEach(chip => {
+    const v = chip.getAttribute('data-rounds');
+    chip.classList.toggle('selected', (v === 'all' ? 'all' : parseInt(v, 10)) === roundsChoice);
+    chip.onclick = () => {
+      roundsChoice = v === 'all' ? 'all' : parseInt(v, 10);
+      try{ localStorage.setItem(ROUNDS_KEY, String(roundsChoice)); }catch(e){}
+      document.querySelectorAll('#roundsChips .pick-chip').forEach(c => c.classList.toggle('selected', c === chip));
+      checkStart();
+    };
+  });
   const modeChipsEl = document.getElementById('modeChips');
   [...modeChipsEl.children].forEach(chip => {
     chip.onclick = () => {
@@ -2622,7 +2660,7 @@
       [...modeChipsEl.children].forEach(c => c.classList.toggle('selected', c === chip));
       document.getElementById('quizSettings').style.display = chosenMode === 'quiz' ? 'block' : 'none';
       document.getElementById('modeHint').textContent = MODE_HINTS[chosenMode] || '';
-      if(chosenMode === 'hitster' && tracks.some(t => !t.yr)) runYearResolver(); // Jahre schon mal im Hintergrund prüfen
+      if(chosenMode === 'hitster' && tracks.some(t => !t.yr)) runYearResolver(hitsterNeeded(1)); // Jahre schon mal im Hintergrund prüfen — nur so viele wie die Runden brauchen
       checkStart();
     };
   });
@@ -2713,7 +2751,7 @@
     gameMode = 'quiz';
     remoteRound = 0; judgedMap = {}; judgeUids = null; hResults = []; hTimelines = {};
     quizCountdownMs = QUIZ_CD();
-    deck = shuffle(tracks.map((_, i) => i));
+    deck = limitDeck(shuffle(tracks.map((_, i) => i)));
     totalDeckSize = deck.length;
     currentPlayerIdx = 0;
     mp.onGameStart(players.map(p => p.uid), 'quiz').catch(syncError);
@@ -2739,7 +2777,7 @@
       hTimelines[p.uid] = [{ y: t.yr.y, t: t.title, a: t.artist, r: 0 }];
       p.score = 1;
     });
-    deck = pool;
+    deck = limitDeck(pool);
     totalDeckSize = deck.length;
     currentPlayerIdx = 0;
     mp.onGameStart(players.map(p => p.uid), 'hitster').then(() => mp.onTimelines(hTimelines)).catch(syncError);
@@ -2758,11 +2796,13 @@
       const roomPlayers = mp ? mp.getRoomPlayers() : [];
       if(roomPlayers.length < 1){ checkStart(); return; }
       const hint = document.getElementById('remoteStartHint');
-      if(tracks.some(t => !t.yr)){
+      // Nur so viele Songs prüfen, wie für die gewählten Runden (plus Startkarten) nötig sind — schon geprüfte sind im Browser gemerkt
+      const needed = hitsterNeeded(roomPlayers.length);
+      if(hitsterEligible().length < needed && tracks.some(t => !t.yr)){
         startGameBtn.disabled = true;
         hint.style.display = 'block';
         hint.textContent = 'Jahre werden geprüft … bitte kurz warten (nur beim ersten Mal, danach sind sie gemerkt).';
-        await runYearResolver();
+        await runYearResolver(needed);
         startGameBtn.disabled = false;
       }
       const eligible = hitsterEligible();
@@ -2795,7 +2835,7 @@
       judgedMap = {};
       mp.onGameStart(players.map(p => p.uid)).catch(syncError);
     }
-    deck = shuffle(tracks.map((_,i)=>i));
+    deck = limitDeck(shuffle(tracks.map((_,i)=>i)));
     totalDeckSize = deck.length;
     currentPlayerIdx = 0;
     setupScreen.style.display = 'none';
