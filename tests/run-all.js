@@ -12,6 +12,8 @@ const suites = [
   ['smoke7.js',       'Playlists, Songauswahl sichern, Debug-Ansicht'],
   ['smoke11.js',      'Playlist-Import (ganze Playlist)'],
   ['smoke8.js',       'Jahre ermitteln (MusicBrainz)'],
+  ['smoke12.js',      'Runden pro Spiel, sparsames Jahre-Prüfen (Hitster)'],
+  ['smoke13.js',      'Gemeinsamer Jahre-Speicher (Firebase)'],
   ['smoke9.js',       'Hitster-Modus'],
   ['smoke10.js',      'Quiz-Modus'],
   ['rules_test.js',   'Firebase-Regeln'],

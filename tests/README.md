@@ -28,6 +28,8 @@ Der Ordner `tests/` liegt **im Repo neben** `index.html` und `docs/`. Die Tests 
 | `smoke7.js` | Playlists merken, Songauswahl sichern, Debug-Ansicht |
 | `smoke8.js` | Jahre ermitteln (MusicBrainz) |
 | `smoke11.js` | Playlist-Import: ganze Playlist, Paging, Duplikate, Filter |
+| `smoke12.js` | Runden pro Spiel, sparsames Jahre-Prüfen im Hitster-Modus |
+| `smoke13.js` | Gemeinsamer Jahre-Speicher (Firebase `years/`): Treffer, Schreiben, Rückfälle ohne/mit gesperrtem Firebase |
 | `smoke9.js` | Hitster-Modus |
 | `smoke10.js` | Quiz-Modus |
 | `rules_test.js` | Firebase-Regeln (Simulator `rules_sim.js`) |
@@ -38,7 +40,7 @@ Der Ordner `tests/` liegt **im Repo neben** `index.html` und `docs/`. Die Tests 
 - Neue Funktion → **neue Testreihe** `smokeN.js` (Vorlage: `smoke9.js` / `smoke10.js`) und in `run-all.js` eintragen.
 - Geänderte Firebase-Regeln → `rules_test.js` um die neuen Fälle erweitern.
 - Zeitgeber lassen sich verkürzen: `window.PT_HEARTBEAT_MS`, `PT_MB_GAP_MS`, `PT_QUIZ_COUNTDOWN_MS`, `PT_OFFLINE_DELAY_MS`.
-- Die Attrappe wertet Sicherheitsregeln **nicht** aus — dafür `rules_test.js`.
+- Die Attrappe wertet Sicherheitsregeln **nicht** aus — dafür `rules_test.js`. Nur für `years/` bildet sie „einmal schreiben, nie überschreiben“ nach und kann Zugriff sperren (`shared.denyYears`) oder hängen lassen (`shared.hangYears`).
 - Echtes Spotify, MusicBrainz und echte Handys bleiben ein manueller Test.
 
 ## Screenshots (optional)

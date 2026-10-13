@@ -48,7 +48,7 @@ const reload = (old, uid) => { const st={}; for(let i=0;i<old.window.localStorag
   ok(H.querySelectorAll('#quizKindChips .pick-chip').length===3 && H.querySelectorAll('#quizCountdownChips .pick-chip').length===3, 'Frage: Band/Titel/Gemischt; Countdown: 5/10/15 s');
   H.querySelector('#quizCountdownChips .pick-chip[data-sec="5"]').click();
   ok(H.querySelector('#quizCountdownChips .pick-chip[data-sec="5"]').classList.contains('selected') && !H.querySelector('#quizCountdownChips .pick-chip[data-sec="10"]').classList.contains('selected'), 'Countdown-Wahl wird markiert');
-  ok(H.getElementById('startGameBtn').disabled===false && /Quiz mit 3 Handy-Spielern: 8 Songs = 8 Runden/.test(H.getElementById('remoteStartHint').textContent), 'Hinweis: „Quiz mit 3 Handy-Spielern: 8 Songs = 8 Runden“');
+  ok(H.getElementById('startGameBtn').disabled===false && /Quiz mit 3 Handy-Spielern: 8 Songs → 8 Runden/.test(H.getElementById('remoteStartHint').textContent), 'Hinweis: „Quiz mit 3 Handy-Spielern: 8 Songs → 8 Runden“');
 
   const corr = () => JSON.parse(host.window.localStorage.getItem('plattenteller_host_game')).quizCorrect;
   const cur = () => { const g=JSON.parse(host.window.localStorage.getItem('plattenteller_host_game')); return g.tracks[g.currentTrackId]; };

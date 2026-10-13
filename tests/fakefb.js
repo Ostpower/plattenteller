@@ -21,8 +21,19 @@ module.exports = function makeFirebase(shared, uid, owner){
   const reject = () => Promise.reject(Object.assign(new Error('PERMISSION_DENIED: Permission denied'), {code:'PERMISSION_DENIED'}));
   const ref = (path) => ({
     child: p => ref(path+'/'+p),
-    once: async()=> { if(denied('once', path)) throw Object.assign(new Error('PERMISSION_DENIED: Permission denied'), {code:'PERMISSION_DENIED'}); return snapOf(path); },
-    set: async v => { if(denied('set', path)) return reject(); setAt(path, resolve(v)); fire(); },
+    once: async()=> {
+      if(/^years\//.test(path0(path))){ // gemeinsamer Jahre-Speicher: zählen, sperren oder hängen lassen
+        (shared.yearReads = shared.yearReads || []).push(path0(path));
+        if(shared.hangYears) return new Promise(()=>{});
+        if(shared.denyYears) throw Object.assign(new Error('PERMISSION_DENIED: Permission denied'), {code:'PERMISSION_DENIED'});
+      }
+      if(denied('once', path)) throw Object.assign(new Error('PERMISSION_DENIED: Permission denied'), {code:'PERMISSION_DENIED'}); return snapOf(path); },
+    set: async v => {
+      if(/^years\//.test(path0(path))){ // Regeln nachgebildet: nur schreiben, wenn es den Eintrag noch nicht gibt
+        (shared.yearWriteTries = shared.yearWriteTries || []).push(path0(path));
+        if(shared.denyYears || get(path) !== undefined) return reject();
+      }
+      if(denied('set', path)) return reject(); setAt(path, resolve(v)); fire(); },
     update: async v => { for(const k of Object.keys(v)) setAt(path+'/'+k, resolve(v[k])); fire(); },
     remove: async()=>{ if(denied('remove', path)) return reject(); setAt(path,null); fire(); },
     on: (ev, cb) => { listeners.push({path, cb, owner}); if(path==='.info/connected') cb({val:()=>true}); else cb(snapOf(path)); return cb; },

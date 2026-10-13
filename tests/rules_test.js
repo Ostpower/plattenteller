@@ -198,4 +198,48 @@ ok(w(H,R+'/round/state','guessing'), 'Host darf Runde wieder öffnen');
   ok(w(H,R5+'/round',{...base.round,n:4,options:['W','X','Y','Z']}), 'Host darf die Quiz-Runde (Optionen) schreiben');
   ok(!w(P1,R5+'/round/options',['A','A','A','A']), 'Spieler darf Optionen NICHT ändern');
 }
+
+// ===== Gemeinsamer Jahre-Speicher (years/<ISRC>) =====
+{
+  T = {};
+  global.__NOW__ = Date.UTC(2026, 9, 13);   // 13.10.2026
+  const NOW = global.__NOW__;
+  const Y = (o={}) => ({ y: 1985, s: 'mb', t: NOW, ...o });
+  const ISRC = 'GBAYE0601498';
+  ok(w(P1,'years/'+ISRC,Y()), 'Jahre: angemeldetes Gerät darf neuen Eintrag schreiben');
+  ok(w(P2,'years/USRC17607839',Y({s:'mb-orig'})) && w(P2,'years/DEA620000001',Y({s:'spotify'})), 'Jahre: Quellen mb-orig und spotify erlaubt');
+  ok(!w(NO,'years/'+ISRC,Y()), 'Jahre: ohne Anmeldung kein Schreiben');
+  ok(!canRead(T,'years/'+ISRC,NO), 'Jahre: ohne Anmeldung kein Lesen');
+  apply('years/'+ISRC,Y());
+  ok(canRead(T,'years/'+ISRC,P2), 'Jahre: angemeldete Geräte dürfen einen Eintrag lesen');
+  ok(!canRead(T,'years',P2), 'Jahre: die ganze Liste ist nicht auf einmal lesbar');
+  ok(!w(P2,'years/'+ISRC,Y({y:1990})), 'Jahre: bestehenden Eintrag NICHT überschreiben (auch nicht von anderem Gerät)');
+  ok(!w(P1,'years/'+ISRC,Y({y:1990})), 'Jahre: auch der Schreiber selbst kann nicht überschreiben');
+  ok(!w(P1,'years/'+ISRC+'/y',1999), 'Jahre: einzelnes Feld ändern abgelehnt');
+  ok(!w(P1,'years/'+ISRC,null), 'Jahre: Eintrag löschen abgelehnt');
+  // Form der ISRC
+  ok(!w(P1,'years/gbaye0601499',Y()), 'Jahre: ISRC in Kleinbuchstaben abgelehnt');
+  ok(!w(P1,'years/GBAYE060149',Y()), 'Jahre: ISRC mit 11 Zeichen abgelehnt');
+  ok(!w(P1,'years/GBAYE06014999',Y()), 'Jahre: ISRC mit 13 Zeichen abgelehnt');
+  ok(!w(P1,'years/GB-AYE060149',Y()), 'Jahre: ISRC mit Sonderzeichen abgelehnt');
+  // Wertebereich
+  ok(w(P1,'years/AAAAA0000001',Y({y:1900})), 'Jahre: 1900 ist die Untergrenze (erlaubt)');
+  ok(!w(P1,'years/AAAAA0000002',Y({y:1899})), 'Jahre: 1899 abgelehnt');
+  ok(w(P1,'years/AAAAA0000003',Y({y:2026})) && w(P1,'years/AAAAA0000004',Y({y:2027})), 'Jahre: aktuelles Jahr und Jahr+1 erlaubt (Vorab-Veröffentlichung)');
+  ok(!w(P1,'years/AAAAA0000005',Y({y:2028})), 'Jahre: Jahr+2 abgelehnt');
+  ok(!w(P1,'years/AAAAA0000006',Y({y:1985.5})), 'Jahre: Dezimalzahl abgelehnt');
+  ok(!w(P1,'years/AAAAA0000007',Y({y:'1985'})), 'Jahre: Jahr als Text abgelehnt');
+  // Quelle, Zeitstempel, Form
+  ok(!w(P1,'years/AAAAA0000008',Y({s:'manuell'})), 'Jahre: unbekannte Quelle abgelehnt');
+  ok(!w(P1,'years/AAAAA0000009',Y({s:5})), 'Jahre: Quelle muss Text sein');
+  ok(!w(P1,'years/AAAAA0000010',Y({t:123})), 'Jahre: gefälschter Zeitstempel (≠ Serverzeit) abgelehnt');
+  ok(!w(P1,'years/AAAAA0000011',{ y:1985, s:'mb' }), 'Jahre: ohne Zeitstempel abgelehnt');
+  ok(!w(P1,'years/AAAAA0000012',{ s:'mb', t:NOW }), 'Jahre: ohne Jahr abgelehnt');
+  ok(!w(P1,'years/AAAAA0000013',Y({extra:'x'})), 'Jahre: zusätzliche Felder abgelehnt');
+  ok(!w(P1,'years/AAAAA0000014',Y({t:NOW-1})), 'Jahre: Zeitstempel eine ms daneben abgelehnt');
+  ok(!w(P1,'years/AAAAA0000015',Y({y:null})), 'Jahre: Jahr null abgelehnt');
+  // andere Bereiche bleiben unberührt
+  ok(!w(P1,'years',{ [ISRC]: Y() }), 'Jahre: ganze Liste auf einmal ersetzen abgelehnt (Eintrag existiert)');
+  ok(!canRead(T,'rooms',P1), 'Jahre: Regeln für Räume unverändert (rooms nicht lesbar)');
+}
 console.log(fails? '\n'+fails+' FEHLER':'\nALLE REGEL-TESTS OK'); process.exit(fails?1:0);

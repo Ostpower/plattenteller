@@ -3,6 +3,8 @@ const PT_FS = require('fs'), PT_PATH = require('path');
 // Regeln: docs/firebase-rules.json (Standard) oder firebase-rules.json im Repo-Hauptordner; per PT_RULES überschreibbar
 const PT_RULES = process.env.PT_RULES || [PT_PATH.join(__dirname,'..','docs','firebase-rules.json'), PT_PATH.join(__dirname,'..','firebase-rules.json')].find(p => PT_FS.existsSync(p));
 if(!PT_RULES){ console.error('firebase-rules.json nicht gefunden (docs/ oder Hauptordner, oder PT_RULES setzen)'); process.exit(2); }
+// Firebase-Regelsprache: $variable.matches(/regex/) — für Strings nachrüsten
+if(!String.prototype.matches) Object.defineProperty(String.prototype,'matches',{value:function(re){ return re.test(String(this)); }});
 const rules = JSON.parse(PT_FS.readFileSync(PT_RULES,'utf8')).rules;
 const clone = x => x===undefined?undefined:JSON.parse(JSON.stringify(x));
 const keys = p => p.split('/').filter(Boolean);
