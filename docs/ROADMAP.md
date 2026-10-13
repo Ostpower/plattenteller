@@ -1,49 +1,32 @@
 # Roadmap
 
-Geplant, aber noch nicht gebaut — Status vor Umsetzung jeweils neu verifizieren.
+Geplant, aber noch nicht gebaut — Status vor Umsetzung jeweils neu verifizieren. Stand: 2026-10-13 (nach v2026-10-13.1).
 
-## 1. Multi-Smartphone-Multiplayer (Hauptvorhaben)
+## Offen
 
-Ziel: Jeder Spieler tippt seinen Guess auf dem eigenen Handy statt an einem gemeinsamen Gerät — inspiriert vom "Title & Artist"-Modus bei Beatify (QR-Code-Beitritt, zentrale Auswertung).
+1. **Fest eingebaute Playlists**: Marcels Liste über „Liste kopieren“ holen und in `DEFAULT_PLAYLISTS` eintragen.
+2. **Host spielt mit**: Der Host soll auch mitspielen können; dafür darf die Songliste beim Erstellen nicht offen sein,
+   nur auf Wunsch über „öffnen“.
+3. **TV als Host**: Song starten usw. ist auf einem TV umständlich — Bedienkonzept klären (z. B. Fernbedienung über ein Handy).
+4. **Reihenfolge-Modus über Handys**: nur das Handy des aktiven Spielers tippt, mit Streak und Klau-Powerup.
+5. **Schnelligkeitsbonus** für „Zusammen“ und „Hitster“ (im Quiz schon drin).
+6. Ideen: Herkunftsland des Interpreten (MusicBrainz) als Bonusfrage; Titelzusätze („– Remastered“) überall ausblenden.
 
-**Geräte-Setup (festgelegt):**
+## Erledigt (Auszug, Details im `CHANGELOG.md`)
 
-- **Host-Ansicht** (mit Songauflösung, Judge-Grid, Steuerung) läuft auf einem separaten Gerät mit großem Bildschirm — Ziel-Setup ist ein **Android TV**.
-- **Am Festival** (ohne festen Fernseher) ersatzweise ein **Android-Tablet oder iPad** als Host-Display.
-- **Spieler-Handys**: öffnen Link/QR-Code, geben Namen ein, tippen Guess — kein Musik-Handling.
+- Multi-Smartphone-Multiplayer über Firebase (Lobby, Tippen, Zeitmessung, Wiederherstellung, Offline, Aufräumen) — Technik in `firebase-multiplayer-plan.md`.
+- Playlist-Import übernimmt die ganze Playlist (v2026-10-13.1).
+- Spielmodi „Hitster“ und „Quiz“. Neues Design (Equalizer statt Kassette). Playlists merken, Songauswahl sichern, Jahre ermitteln.
 
-**Grobe Architektur (skizziert, nicht implementiert):**
+## Selbst-gehostete Backend-Option (shelved)
 
-- **Sync-Layer:** Firebase Realtime Database (oder vergleichbarer Cloud-Realtime-Dienst wie Supabase/PartyKit) — kein eigener Server nötig, bleibt bei GitHub Pages als Hosting, funktioniert auch am Festival über Mobilfunk statt gemeinsamem WLAN.
-
-**Angedachtes Datenmodell:**
-```
-games/{gameId}/
-  state: "lobby" | "playing" | "reveal" | "end"
-  currentRound: 3
-  players/{playerId}: { name, score, streak, stealAvailable, stealUsed }
-  rounds/{roundIndex}/guesses/{playerId}: { title, artist, submittedAt }
-```
-
-**Was sich grundlegend ändert:**
-- Zentraler Spielzustand statt lokaler JS-Variablen
-- Spieler-Beitritt per Link/QR statt lokaler Namensliste
-- Scoring-Logik: manuelles Judge-Grid funktioniert bei mehreren gleichzeitigen Guesses nicht mehr → automatischer Text-Abgleich (tippfehlertolerant, à la Beatify) oder Host bekommt eine Liste aller Guesses zum schnellen Abhaken
-- Neue, schlankere UI-Ansicht für Spieler-Handys
-- Host-UI muss für TV-/Tablet-Bildschirmgrößen taugen (andere Auflösung/Bedienung als reines Handy-Layout bisher)
-
-**Was gleich bleibt:** Kassetten-UI, Spotify-Wiedergabe, Genre-/Playlist-Import bleiben beim Host unverändert.
-
-**Aufwandseinschätzung:** kein kleiner Patch — eher Wochenendprojekt-Größenordnung als Ein-Stunden-Änderung.
-
-## 2. Selbst-gehostete Backend-Option
-
-- Node.js/Express-Server mit `/token`-Endpoint, um das Spotify Client Secret serverseitig zu halten.
-- Würde auch die Deezer-CORS-Blockade lösen (Deezer läuft im Server-Ansatz problemlos, da serverseitig statt im Browser).
+- Node.js/Express-Server mit `/token`-Endpoint, um das Spotify Client Secret serverseitig zu halten; würde auch die Deezer-CORS-Blockade lösen.
 - Zielumgebung: Marcels Proxmox-Home-NAS (`hbs19.uk`, hinter Cloudflare, gleiche Infrastruktur wie Vaultwarden/Nextcloud).
-- **Aktuell shelved** wegen Proxmox-LXC-Setup-Reibung — GitHub Pages bleibt bis auf Weiteres der aktive Deployment-Weg.
+- **Aktuell shelved** wegen Proxmox-LXC-Setup-Reibung — GitHub Pages bleibt der aktive Deployment-Weg.
 
 ## Verworfen (bewusst nicht weiterverfolgt)
 
-- Speed-Rating-Chip (Normal/Flott/Blitzschnell) — nach Test wieder komplett entfernt.
-- Timeline/Fortschrittsbalken — verursachte Song-Neustart bei Position 0 nach Pause (Spotify-Session-Verhalten), entfernt.
+- Speed-Rating-Chip (Normal/Flott/Blitzschnell) — nach Test wieder entfernt.
+- Timeline/Fortschrittsbalken **für die Wiedergabe** — verursachte Song-Neustart bei Position 0 nach Pause (Spotify-Session-Verhalten).
+- Kassetten-Design — durch das Equalizer-Design ersetzt (v2026-10-11.1).
+- Automatisches Senden von Tipps — Spieler schicken selbst ab (v2026-10-10.3).

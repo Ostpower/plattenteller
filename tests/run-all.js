@@ -10,6 +10,7 @@ const suites = [
   ['smoke5.js',       'Offline, Aussteigen, Späteinsteiger'],
   ['smoke6.js',       'Rangliste, Fortschritt, Play-Anzeige'],
   ['smoke7.js',       'Playlists, Songauswahl sichern, Debug-Ansicht'],
+  ['smoke11.js',      'Playlist-Import (ganze Playlist)'],
   ['smoke8.js',       'Jahre ermitteln (MusicBrainz)'],
   ['smoke9.js',       'Hitster-Modus'],
   ['smoke10.js',      'Quiz-Modus'],

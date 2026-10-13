@@ -27,6 +27,7 @@ Der Ordner `tests/` liegt **im Repo neben** `index.html` und `docs/`. Die Tests 
 | `smoke6.js` | Rangliste, Fortschritt, Play-Anzeige |
 | `smoke7.js` | Playlists merken, Songauswahl sichern, Debug-Ansicht |
 | `smoke8.js` | Jahre ermitteln (MusicBrainz) |
+| `smoke11.js` | Playlist-Import: ganze Playlist, Paging, Duplikate, Filter |
 | `smoke9.js` | Hitster-Modus |
 | `smoke10.js` | Quiz-Modus |
 | `rules_test.js` | Firebase-Regeln (Simulator `rules_sim.js`) |

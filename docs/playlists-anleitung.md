@@ -26,7 +26,7 @@ Der Ordner dient nur der Ordnung in Spotify. **Plattenteller kann Ordner nicht s
 1. **Mit Spotify verbinden.** Erscheint der Hinweis „Berechtigung erweitern“, einmal darauf tippen und bei Spotify zustimmen (nötig für private Playlists).
 2. Bereich **„2. Songs finden“ → „Meine Playlists (Spotify)“ → „Meine Playlists aus Spotify holen“**.
 3. Im Filterfeld `Plattenteller` eintippen und bei jeder gewünschten Playlist auf **„Merken“** tippen.
-4. Die gemerkten Playlists stehen oben in der Liste. **„Laden“** holt daraus eine zufällige Auswahl (Anzahl Songs oben einstellbar, bis 100; höchstens 2 Songs je Interpret). **„Andere Auswahl aus dieser Playlist“** würfelt neu.
+4. Die gemerkten Playlists stehen oben in der Liste. **„Laden“** übernimmt die **ganze Playlist** (keine Zufallsauswahl, keine Begrenzung auf 2 Songs je Interpret; doppelte Songs werden entfernt). Gemischt wird erst beim Spielstart. „Anzahl Songs“ (bis 100) und die Max-2-Regel gelten nur für die Suche nach Genre oder Freitext.
 5. Der Songstapel bleibt auch nach einem Neuladen erhalten. **„Alle entfernen“** leert ihn.
 
 ### Neue Playlist später hinzufügen

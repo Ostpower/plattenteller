@@ -1,7 +1,7 @@
 # Plattenteller — Übergabe an einen neuen Chat (Stand 2026-10-13)
 
 Browserbasiertes Musik-Ratespiel, eine einzige `index.html`, GitHub Pages. Repo: `github.com/Ostpower/plattenteller`,
-live: `ostpower.github.io/plattenteller`. Aktuelle Version: **v2026-10-11.6** (Format `JJJJ-MM-TT.N`).
+live: `ostpower.github.io/plattenteller`. Aktuelle Version: **v2026-10-13.1** (Format `JJJJ-MM-TT.N`). Doku-Stand: `docs/` komplett aktualisiert am 2026-10-13.
 
 ## Ordnerstruktur und Neustart
 Repo-Ordner: `index.html`, `docs/` (CHANGELOG, diese Übergabe, Plan, Playlists-Anleitung, `firebase-rules.json`), `tests/`
@@ -25,7 +25,7 @@ laden, diese Datei lesen, Tests einrichten und laufen lassen. Am Ende jeder Sitz
 - **Mehrere Handys (Firebase):** Raumcode/QR, Lobby, Tipp mit Serverzeit, Neuladen des Hosts stellt das Spiel wieder her,
   Offline-Hinweis, Aussteigen, Späteinsteiger (nicht bei Hitster), automatisches Aufräumen alter Räume.
 - **Playlists:** eigene Spotify-Playlists holen, „Merken“ (pro Browser, `DEFAULT_PLAYLISTS` im Code für fest eingebaute),
-  Songauswahl bleibt nach Neuladen, bis 100 Songs. Jahre per MusicBrainz (ISRC), Live/Compilation werden erkannt.
+  Import = ganze Playlist, Songauswahl bleibt nach Neuladen; Suche bis 100 Songs. Jahre per MusicBrainz (ISRC), Live/Compilation werden erkannt.
 - **Entwickler-Ansicht** „Song-Daten prüfen“ zeigt, was Spotify/MusicBrainz liefern.
 
 ## Firebase
@@ -36,6 +36,10 @@ Projekt `plattenteller-80cd8` (Spark), Realtime Database europe-west1, Anonymous
 Da: Titel, Interpret, Album, Albumtyp, Album-Datum, Länge, Explicit, ISRC, Track-Nr. Fehlt: Popularität, Märkte,
 Vorschau-URL, Label, Genres, Follower. Playlist-Inhalte nur für **eigene** Playlists. MusicBrainz funktioniert direkt im Browser (CORS ok).
 Das Album-Datum kann bei Live/Bonus/Compilation falsch sein, deshalb die Jahre-Ermittlung.
+
+## Playlist-Import (geklärt, v2026-10-13.1)
+Die **ganze Playlist** wird übernommen (Entscheidung Marcel). Zufallsauswahl und Max-2-Interpret-Regel gelten nur für die Suche
+(Genre/Freitext) und das manuelle Hinzufügen. Hintergrund: Die Cowork-Version vom 26.09. hatte das, die Chat-Versionen davor nicht.
 
 ## Offen (Wunschliste von Marcel)
 1. Fest eingebaute Playlists: Marcel schickt seine Liste („Liste kopieren“), dann in `DEFAULT_PLAYLISTS` eintragen.
