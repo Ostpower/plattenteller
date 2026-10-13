@@ -392,7 +392,7 @@
 
       <div class="row row-stack">
         <div class="field">
-          <label>Anzahl Songs (4–100)</label>
+          <label>Anzahl Songs bei der Suche (4–100)</label>
           <input type="number" id="deckSizeInput" value="15" min="4" max="100">
         </div>
         <div class="field">
@@ -424,7 +424,7 @@
       <details class="advanced" open id="playlistBlock">
         <summary>Meine Playlists (Spotify)</summary>
         <p class="hint" style="margin-top:10px;">
-          Deine Playlists aus Spotify. Mit „Laden“ holt die App daraus eine zufällige Auswahl (max. 2 Songs je Interpret). Spotify gibt seit 2026 nur <strong>eigene</strong> Playlists frei — fremde vorher in Spotify als neue Playlist kopieren.
+          Deine Playlists aus Spotify. Mit „Laden“ wird die <strong>ganze Playlist</strong> übernommen (gemischt wird erst beim Spielstart). „Anzahl Songs“ und die Max-2-Regel gelten nur für die Suche. Spotify gibt seit 2026 nur <strong>eigene</strong> Playlists frei — fremde vorher in Spotify als neue Playlist kopieren.
         </p>
         <div id="savedPlaylists"></div>
         <div id="savedPlaylistsEmpty" class="empty-note">Noch keine Playlists gemerkt. Hol sie dir direkt aus Spotify oder füge unten einen Link ein.</div>
@@ -449,7 +449,6 @@
           <button class="btn-ghost" id="savePlaylistBtn">Merken</button>
         </div>
         <div id="playlistImportStatus" class="empty-note"></div>
-        <button class="btn-ghost btn-block" id="reshufflePlaylistBtn" style="display:none; margin-top:8px;">Andere Auswahl aus dieser Playlist</button>
 
         <details class="advanced">
           <summary>Liste sichern / auf anderes Gerät übertragen</summary>
@@ -804,7 +803,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-11.6';
+  const APP_VERSION = '2026-10-13.1';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -1501,8 +1500,7 @@
   const playlistUrlInput = document.getElementById('playlistUrlInput');
   const importPlaylistBtn = document.getElementById('importPlaylistBtn');
   const playlistImportStatus = document.getElementById('playlistImportStatus');
-  const reshufflePlaylistBtn = document.getElementById('reshufflePlaylistBtn');
-  let importedPlaylistPool = [];
+  let lastPlaylistSkipped = 0; // wegen nicht-lateinischer Schrift übersprungene Songs des letzten Imports
 
   document.querySelectorAll('#hitsterPresetChips .pick-chip').forEach(chip => {
     chip.onclick = () => {
@@ -1560,19 +1558,9 @@
       pageCount++;
       playlistImportStatus.textContent = 'Lade Playlist… (' + pool.length + ' Songs)';
     }
+    lastPlaylistSkipped = skippedNonLatin;
     if(skippedNonLatin) console.log('Playlist-Import: ' + skippedNonLatin + ' Songs mit nicht-lateinischer Schrift übersprungen');
     return pool;
-  }
-
-  function sampleFromImportedPool(){
-    const desired = Math.max(4, Math.min(100, parseInt(deckSizeInput.value) || 15));
-    const maxPerArtist = 2;
-    const picked = pickWithArtistCap(importedPlaylistPool, desired, maxPerArtist);
-    tracks = picked;
-    playlistImportStatus.textContent = tracks.length + ' von ' + importedPlaylistPool.length + ' Playlist-Songs geladen (max. ' + maxPerArtist + ' je Interpret)';
-    reshufflePlaylistBtn.style.display = 'inline-block';
-    renderTracks();
-    checkStart();
   }
 
   importPlaylistBtn.onclick = async () => {
@@ -1580,15 +1568,23 @@
     const id = extractPlaylistId(playlistUrlInput.value.trim());
     if(!id){ playlistImportStatus.textContent = 'Das sieht nicht nach einem gültigen open.spotify.com/playlist/-Link aus.'; return; }
     playlistImportStatus.textContent = 'Lade Playlist…';
-    reshufflePlaylistBtn.style.display = 'none';
     try{
       if(!(await ensureFreshToken())){ playlistImportStatus.textContent = 'Nicht verbunden — bitte oben zuerst mit Spotify verbinden.'; return; }
-      importedPlaylistPool = await fetchPlaylistTracks(id);
-      if(importedPlaylistPool.length === 0){
+      const pool = await fetchPlaylistTracks(id);
+      if(pool.length === 0){
         playlistImportStatus.textContent = 'Keine Songs in dieser Playlist gefunden.';
         return;
       }
-      sampleFromImportedPool();
+      // Die ganze Playlist wird 1:1 übernommen (Entscheidung Marcel, 26.09.): keine Zufallsauswahl, keine Max-2-Regel —
+      // eine Playlist ist ein kuratiertes Deck. Nur doppelte Song-IDs fliegen raus.
+      const seen = new Set();
+      tracks = pool.filter(t => { if(seen.has(t.id)) return false; seen.add(t.id); return true; });
+      const dupes = pool.length - tracks.length;
+      playlistImportStatus.textContent = tracks.length + ' Songs aus der Playlist übernommen' +
+        (dupes ? ' (' + dupes + ' doppelte entfernt)' : '') +
+        (lastPlaylistSkipped ? ' (' + lastPlaylistSkipped + ' mit nicht-lateinischer Schrift übersprungen)' : '') + '.';
+      renderTracks();
+      checkStart();
     }catch(err){
       playlistImportStatus.textContent = err.status === 403
         ? 'Spotify gibt nur eigene Playlists frei. In Spotify: Songs markieren (Strg+A) → Rechtsklick → Zur Playlist hinzufügen → Neue Playlist, dann diese Kopie hier laden. (Private Playlists brauchen außerdem die Berechtigung — Hinweis oben im Playlist-Bereich.)'
@@ -1596,7 +1592,6 @@
       console.error('Playlist import error:', err);
     }
   };
-  reshufflePlaylistBtn.onclick = sampleFromImportedPool;
 
   // ---------- GEMERKTE PLAYLISTS ----------
   const PLAYLISTS_KEY = 'plattenteller_playlists';
@@ -2194,8 +2189,6 @@
   clearTracksBtn.onclick = () => {
     if(!window.confirm('Alle ' + tracks.length + ' Songs aus dem Stapel entfernen?')) return;
     tracks = [];
-    importedPlaylistPool = [];
-    reshufflePlaylistBtn.style.display = 'none';
     renderTracks();
     checkStart();
   };
