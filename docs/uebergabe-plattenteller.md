@@ -24,7 +24,7 @@ Repo: `index.html`, `docs/` (CHANGELOG, README, ARCHITECTURE, ROADMAP, diese Üb
 Neuer Chat: laut `docs/anleitung-neue-chats.md` und den Projekt-Anweisungen starten (Repo als ZIP laden, diese Datei lesen, Tests laufen lassen).
 **Am Ende jeder Sitzung diese Datei aktualisieren und mitliefern.**
 
-## Arbeitsweise im Chat
+## Arbeitsweise im Chat (ohne Ordnerzugriff)
 - Kein Zugriff auf Repo oder Festplatte (keine GitHub-Anbindung vorhanden). Änderungen als fertige Dateien liefern; Marcel lädt per Browser hoch.
   Zu jeder Datei sagen, wohin sie gehört; `plattenteller-tests.zip` immer **komplett** neu packen.
 - Vor jeder Änderung die Datei frisch holen; `APP_VERSION` hochzählen, **nie eine vergebene Nummer wiederverwenden** (höchste Nummer im CHANGELOG nachsehen);
@@ -32,6 +32,17 @@ Neuer Chat: laut `docs/anleitung-neue-chats.md` und den Projekt-Anweisungen star
 - Alles in einer `index.html`, kein Framework. UI und Doku auf Deutsch. Max. 2 Songs je Interpret **nur** bei Suche/Zufallsauswahl und manuell hinzugefügten Songs.
   `hasNonLatinScript()` ist Absicht — nicht ohne Rückfrage ändern. Spotify Client ID und Redirect-URI nicht anfassen.
 - Design (dunkel, minimal, Mint, Inter, Equalizer) nicht ohne Absprache ändern.
+
+## Arbeitsweise in Cowork mit lokalem Ordner und GitHub Desktop (seit 13.10.)
+Der lokale Ordner `Hitster-Alternative` ist ein **Git-Klon** von `Ostpower/plattenteller` (Branch `main`); Marcel nutzt GitHub Desktop.
+- **Claude** ändert, testet und pflegt Doku **nur im Ordner** (kein Git-Zugriff auf GitHub, nie selbst pushen). Danach sagt Claude „fertig“ und nennt, welche Dateien sich inhaltlich geändert haben.
+- **Marcel** prüft in GitHub Desktop (Reiter „Changes“), schreibt eine kurze Summary, „Commit to main“, dann „Push origin“. Erst nach dem Push ist `ostpower.github.io/plattenteller` aktuell — danach am Versions-Tag prüfen.
+- **Nur lokal, nicht im Repo** (über `.git/info/exclude` ausgeschlossen): `CLAUDE.md`, `AGENTS.md`, `releases/`. Nicht aus dem Ausschluss nehmen und nicht committen.
+- **Zeilenenden:** Zeigt GitHub Desktop viele Dateien mit „No content changes found“, ist das nur Zeilenenden-/Dateirechte-Rauschen (Claude schreibt LF, der Ordner liegt unter Windows). Beim Commit werden sie nicht mitgenommen; im Reiter „History“ muss der neue Commit nur die tatsächlich geänderten Dateien zählen.
+  Zeigt ein Commit auffällig viele Dateien, **nicht pushen**, sondern Claude fragen.
+- **Tests nie im Ordner `tests/` installieren:** `npm install` dort legt `tests/node_modules` an (tausende Dateien, GitHub-Browser-Upload bricht ab). Claude testet in einer **Kopie außerhalb** des Ordners (z. B. `$HOME/scratch/repo/tests`) und löscht Reste im Ordner.
+- **Vor Arbeitsbeginn prüfen:** Hat Marcel den letzten Stand gepusht? (`git status`/`git log` im Ordner; Abgleich `APP_VERSION` ↔ letzter CHANGELOG-Eintrag.) Sonst nachfragen, bevor eine Versionsnummer vergeben wird.
+- Die älteren Anweisungen unter „Arbeitsweise im Chat“ gelten für **Chat-Sitzungen ohne Ordnerzugriff** (Dateien zum Download liefern, Marcel lädt per Browser hoch).
 
 ## Was es gibt
 - **Modi:** Reihenfolge (ein Gerät, Streak/Klau), Zusammen (alle raten parallel, Host wertet), **Hitster** (eigene Zeitleiste, Jahr einsortieren, automatisch, meiste Karten gewinnen),
@@ -72,5 +83,5 @@ Neue Funktion → neue Reihe (Vorlage `smoke12.js`) und Eintrag in `run-all.js` 
 
 ## Hinweise aus der Sitzung vom 13.10.
 - v2026-10-13.2 stand im Code, aber nicht im CHANGELOG (Runden pro Spiel); in .3 nachgetragen (aus dem Code rekonstruiert). `tests/smoke12.js` (Vorlage) lag im lokalen Ordner nicht vor — als Vorlage `smoke13.js` nehmen.
-- In der Cowork-Sitzung vom 13.10. war der GitHub-ZIP-Download blockiert; gearbeitet wurde mit dem lokalen Ordner. **Stand Repo ↔ lokal vor dem Hochladen vergleichen.**
+- In der Cowork-Sitzung vom 13.10. war der GitHub-ZIP-Download blockiert; gearbeitet wurde mit dem lokalen Ordner. Danach wurde der Ordner zum Git-Klon gemacht (siehe oben), Stand 13.10.: `v2026-10-13.3` ist gepusht, Ordner und GitHub sind inhaltlich gleich.
 - Die Testläufe auf dem PC-Linux sind langsamer: Reihen in Gruppen zu je 4 parallel starten (alle 14 gleichzeitig laufen in die Zeitüberschreitung).
