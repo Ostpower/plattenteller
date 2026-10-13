@@ -812,7 +812,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-13.2';
+  const APP_VERSION = '2026-10-13.3';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -1996,6 +1996,24 @@
   const dropUnsureBtn = document.getElementById('dropUnsureBtn');
   let yearRun = null;
 
+  // Gemeinsamer Jahre-Speicher (Firebase years/<ISRC>): das andere Skript stellt window.PT_YEARS_STORE bereit.
+  // Alles Best-Effort — ohne Firebase, offline oder ohne veröffentlichte Regeln läuft die Ermittlung wie bisher über MusicBrainz.
+  const sharedAsked = new Set();                       // ISRCs, die in dieser Sitzung schon im gemeinsamen Speicher nachgeschlagen wurden
+  const sharedStore = () => window.PT_YEARS_STORE || null;
+  // Holt die Jahre für mehrere Songs gebündelt und legt Treffer im lokalen Cache ab. Rückgabe: Zahl der Treffer.
+  async function prefetchSharedYears(list){
+    const st = sharedStore();
+    if(!st) return 0;
+    const need = list.filter(t => t.isrc && !t.yr && !yearCache['isrc:' + t.isrc] && !sharedAsked.has(t.isrc));
+    if(!need.length) return 0;
+    need.forEach(t => sharedAsked.add(t.isrc));
+    let got = {};
+    try{ got = await st.getMany(need.map(t => t.isrc)) || {}; }catch(e){ got = {}; }
+    let n = 0;
+    need.forEach(t => { const h = got[String(t.isrc).toUpperCase()]; if(h){ yearCache['isrc:' + t.isrc] = h; n++; } });
+    return n;
+  }
+
   function recLooksLive(r){
     return /live|konzert|concert/i.test(r.disambiguation || '') || /^\d{4}-\d{2}-\d{2}:/.test(r.releases && r.releases[0] ? (r.releases[0].title || '') : '');
   }
@@ -2046,6 +2064,14 @@
       }catch(e){ /* ohne ISRC weiter */ }
       if(t.isrc && yearCache['isrc:' + t.isrc]){ t.yr = yearCache['isrc:' + t.isrc]; return false; }
     }
+    // Gemeinsamer Speicher (Firebase): einmal ermittelte Jahre gelten auf allen Geräten
+    if(t.isrc && sharedStore() && !sharedAsked.has(t.isrc)){
+      sharedAsked.add(t.isrc);
+      let got = {};
+      try{ got = await sharedStore().getMany([t.isrc]) || {}; }catch(e){ got = {}; }
+      const h = got[String(t.isrc).toUpperCase()];
+      if(h){ t.yr = h; yearCache['isrc:' + t.isrc] = h; yearCache[keyTA] = h; return 'shared'; }
+    }
     let best = null;
     if(t.isrc){
       try{ const d = await mbJsonRetry('https://musicbrainz.org/ws/2/isrc/' + encodeURIComponent(t.isrc) + '?inc=artist-credits&fmt=json'); best = pickBestRecording(d.recordings || []); }
@@ -2059,11 +2085,11 @@
     const titleFlag = UNSURE_TITLE.test(t.title);
     const liveFlag = !!(best && /live|konzert|concert/i.test(best.disambiguation || ''));
     const compFlag = t.albumType === 'compilation';
-    let unsure = false;
+    let unsure = false, origFailed = false;
     // Kein sauberer MusicBrainz-Treffer, Live/Remix oder Compilation: Originalaufnahme suchen
     if(titleFlag || liveFlag || src !== 'mb'){
       let orig = null;
-      try{ orig = await findOriginalYear(cleanTitleForSearch(t.title), artist1); }catch(e){ /* Suche fehlgeschlagen: mit dem Vorhandenen weiter */ }
+      try{ orig = await findOriginalYear(cleanTitleForSearch(t.title), artist1); }catch(e){ origFailed = true; /* Suche fehlgeschlagen: mit dem Vorhandenen weiter */ }
       await sleep(MB_GAP);
       if(orig){ y = orig; src = 'mb-orig'; }
       else if(titleFlag || liveFlag) unsure = true;       // Live/Remix ohne gefundene Originalaufnahme
@@ -2073,6 +2099,11 @@
     t.yr = { y: y || null, src: src || 'keine', unsure: unsure };
     if(t.isrc) yearCache['isrc:' + t.isrc] = t.yr;
     yearCache[keyTA] = t.yr;
+    // Sicheres Ergebnis mit ISRC → für alle Geräte teilen (einmal schreiben, ohne zu warten). Nicht teilen, wenn die Originalsuche
+    // gescheitert ist: ein vorübergehender Fehler soll kein schwächeres Jahr dauerhaft für alle festschreiben.
+    if(t.isrc && y && !unsure && !origFailed && sharedStore()){
+      try{ sharedStore().put(t.isrc, t.yr); }catch(e){ /* still */ }
+    }
     return true;
   }
 
@@ -2101,14 +2132,17 @@
     yearsCancelBtn.style.display = 'inline-block';
     yearStatus.textContent = 'Jahre werden geprüft … 0 von ' + todo.length;
     run.promise = (async () => {
-      let done = 0, failed = 0;
-      for(const t of todo){
+      let done = 0, failed = 0, sharedHits = 0;
+      for(let i = 0; i < todo.length; i++){
+        const t = todo[i];
         if(run.cancel) break;
         if(target && hitsterEligible().length >= target) break;
-        try{ await resolveOne(t); }
+        if(i % 20 === 0) sharedHits += await prefetchSharedYears(todo.slice(i, i + 20)); // gebündelt aus Firebase, 20 Songs pro Schub
+        if(run.cancel) break;
+        try{ if(await resolveOne(t) === 'shared') sharedHits++; }
         catch(e){ failed++; console.warn('Jahr ermitteln:', t.title, e); }
         done++;
-        yearStatus.textContent = 'Jahre werden geprüft … ' + (target ? hitsterEligible().length + ' von ' + target + ' benötigten Songs mit sicherem Jahr' : done + ' von ' + todo.length) + (failed ? ' (' + failed + ' Fehler)' : '');
+        yearStatus.textContent = 'Jahre werden geprüft … ' + (target ? hitsterEligible().length + ' von ' + target + ' benötigten Songs mit sicherem Jahr' : done + ' von ' + todo.length) + (failed ? ' (' + failed + ' Fehler)' : '') + (sharedHits ? ' · ' + sharedHits + ' aus dem gemeinsamen Speicher' : '');
         if(done % 5 === 0){ saveYearCache(); saveTracks(); }
       }
       saveYearCache();
@@ -3520,6 +3554,59 @@
     authPromise.catch(() => { authPromise = null; }); // nächster Versuch darf neu starten
     return authPromise;
   }
+
+  // ---------- Gemeinsamer Jahre-Speicher (years/<ISRC>) ----------
+  // Der Jahre-Ermittler (anderes Skript) nutzt ihn über window.PT_YEARS_STORE. Reines Best-Effort: bei Fehlern, Offline oder
+  // fehlenden Regeln liefert getMany() leer und put() tut nichts — die Ermittlung läuft dann wie bisher über MusicBrainz.
+  // Pro ISRC wird nur EINMAL geschrieben (Regeln: nie überschreiben); Korrekturen macht Marcel in der Firebase Console.
+  const YS_TIMEOUT_MS = (typeof window.PT_YEARS_TIMEOUT_MS === 'number') ? window.PT_YEARS_TIMEOUT_MS : 4000;
+  const YS_BATCH = 20;
+  let ysDownUntil = 0, ysReady = null, ysWriteDenied = 0;
+  const ysIsrc = s => { const v = String(s || '').toUpperCase(); return /^[A-Z0-9]{12}$/.test(v) ? v : ''; };
+  const ysDenied = e => /PERMISSION_DENIED/i.test(((e && e.code) || '') + ' ' + ((e && e.message) || ''));
+  function ysDown(ms){ ysDownUntil = Date.now() + ms; ysReady = null; }   // Pause nach Fehlern, damit nichts blockiert oder spammt
+  function ysSetup(){
+    if(!ysReady) ysReady = (async () => { if(!initFb()) throw new Error('Firebase nicht geladen'); await ensureAuth(); })();
+    return ysReady;
+  }
+  function ysLimit(p){
+    return Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('Zeitüberschreitung'), { code: 'ys-timeout' })), YS_TIMEOUT_MS))]);
+  }
+  function ysValid(v){
+    return !!v && Number.isInteger(v.y) && v.y >= 1900 && v.y <= new Date().getFullYear() + 1 && ['mb', 'mb-orig', 'spotify'].indexOf(v.s) >= 0;
+  }
+  // ISRCs → { ISRC: { y, src, unsure:false } } (nur Treffer)
+  async function ysGetMany(list){
+    const out = {};
+    const todo = Array.from(new Set((list || []).map(ysIsrc).filter(Boolean)));
+    if(!todo.length || Date.now() < ysDownUntil) return out;
+    try{
+      await ysLimit(ysSetup());
+      for(let i = 0; i < todo.length; i += YS_BATCH){
+        const part = todo.slice(i, i + YS_BATCH);
+        const snaps = await ysLimit(Promise.all(part.map(c => db.ref('years/' + c).once('value'))));
+        snaps.forEach((snap, k) => { const v = snap.val(); if(ysValid(v)) out[part[k]] = { y: v.y, src: v.s, unsure: false }; });
+      }
+    }catch(e){
+      ysDown(ysDenied(e) ? 300000 : 60000);
+      console.warn('Gemeinsamer Jahre-Speicher nicht erreichbar:', (e && e.message) || e);
+    }
+    return out;
+  }
+  function ysPut(isrc, yr){
+    const c = ysIsrc(isrc);
+    if(!c || !yr || yr.unsure || Date.now() < ysDownUntil) return;
+    const rec = { y: yr.y, s: yr.src, t: firebase.database.ServerValue.TIMESTAMP };
+    if(!ysValid(rec)) return;
+    (async () => {
+      try{ await ysLimit(ysSetup()); await db.ref('years/' + c).set(rec); ysWriteDenied = 0; }
+      catch(e){
+        if(ysDenied(e)){ if(++ysWriteDenied >= 5) ysDown(300000); }   // meist: Eintrag existiert schon (gewollt) — oder Regeln fehlen
+        else ysDown(60000);
+      }
+    })();
+  }
+  window.PT_YEARS_STORE = { getMany: ysGetMany, put: ysPut };
 
   function friendlyError(e){
     const code = (e && e.code) || '';
