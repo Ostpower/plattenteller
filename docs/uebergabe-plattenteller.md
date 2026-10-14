@@ -1,13 +1,19 @@
 # Plattenteller — Übergabe an einen neuen Chat
 
-Stand: 2026-10-13 · Version: **v2026-10-13.3** (Format `JJJJ-MM-TT.N`) · Browser-Musik-Quiz, eine Datei `index.html`, GitHub Pages.
+Stand: 2026-10-13 · Version: **v2026-10-13.4** (Format `JJJJ-MM-TT.N`) · Browser-Musik-Quiz, eine Datei `index.html`, GitHub Pages.
 Repo: `github.com/Ostpower/plattenteller` · Live: `ostpower.github.io/plattenteller`.
 
 ## NÄCHSTE AUFGABE
 
 Keine feste Aufgabe offen — Marcel nennt die nächste (Wunschliste unten). **Erst prüfen, ob v2026-10-13.3 hochgeladen und die neuen Firebase-Regeln veröffentlicht sind** (siehe unten).
 
-## Zuletzt erledigt: Gemeinsamer Jahre-Speicher in Firebase (v2026-10-13.3)
+## Zuletzt erledigt (v2026-10-13.4): PT-Kürzel für Playlists, Songliste eingeklappt
+- „Meine Playlists“ zeigt nur Playlists mit Namensanfang **„PT“** (z. B. „PT Metal 90er“) oder `#pt` in der Beschreibung — Ordner kann die Spotify-API nicht lesen. Konstante `PLAYLIST_TAG`.
+  **Marcel muss seine Plattenteller-Playlists in Spotify entsprechend umbenennen** (sonst erscheint der Hinweis „Keine Playlist mit dem Kürzel…“).
+- Songliste im Stapel ist standardmäßig zugeklappt („Songliste öffnen (N)“). Tests: `smoke14.js`.
+- Offen dazu: ob Marcel die Playlists später lieber fest einbauen will (`DEFAULT_PLAYLISTS`, gilt dann auf allen Geräten ohne „Merken“; „Merken“ gilt sonst pro Browser).
+
+## Davor erledigt: Gemeinsamer Jahre-Speicher in Firebase (v2026-10-13.3)
 
 - Pfad `years/<ISRC>` → `{ y, s, t }` (Jahr, Quelle `mb`/`mb-orig`/`spotify`, Serverzeit). Nur **sichere** Jahre mit ISRC; unsichere (⚠) und Ergebnisse nach gescheiterter Originalsuche bleiben lokal.
 - Ablauf in `resolveOne()`: lokaler Cache → Firebase (gebündelt, 20 Songs pro Schub) → MusicBrainz; nach sicherem MusicBrainz-Ergebnis Schreiben ohne Warten.
@@ -63,7 +69,7 @@ Da: Titel, Interpret, Album, Albumtyp, Album-Datum, Länge, Explicit, ISRC, Trac
 Playlist-Inhalte nur für **eigene** Playlists. MusicBrainz funktioniert direkt im Browser (CORS ok). Das Album-Datum kann bei Live/Bonus/Compilation falsch sein.
 
 ## Tests (`tests/`)
-15 Testreihen, 602 Prüfungen, `cd tests && npm install && npm test` (ca. 2,5 Minuten). **Im Chat nie im Hintergrund starten und mit `timeout 280` aufrufen**
+16 Testreihen, 619 Prüfungen, `cd tests && npm install && npm test` (ca. 2,5 Minuten). **Im Chat nie im Hintergrund starten und mit `timeout 280` aufrufen**
 (ein Befehl darf höchstens 300 s laufen, Hintergrundprozesse werden beendet); beim Entwickeln einzelne Reihen mit `node smokeN.js`. jsdom ist auf 30.1.2 festgeschrieben.
 Neue Funktion → neue Reihe (Vorlage `smoke12.js`) und Eintrag in `run-all.js` und `tests/README.md`. Echtes Spotify/MusicBrainz/Firebase-Live/Handys testet Marcel selbst — das immer klar sagen.
 

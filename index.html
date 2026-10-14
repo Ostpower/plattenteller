@@ -418,24 +418,27 @@
             <button class="btn-ghost btn-sm" id="dropUnsureBtn" style="display:none;">Unsichere entfernen</button>
           </div>
         </div>
-        <div id="trackList"></div>
+        <details class="advanced" id="trackDetails" style="display:none;">
+          <summary id="trackSummary">Songliste öffnen</summary>
+          <div id="trackList"></div>
+        </details>
       </div>
 
       <details class="advanced" open id="playlistBlock">
         <summary>Meine Playlists (Spotify)</summary>
         <p class="hint" style="margin-top:10px;">
-          Deine Playlists aus Spotify. Mit „Laden“ wird die <strong>ganze Playlist</strong> übernommen (gemischt wird erst beim Spielstart). „Anzahl Songs“ und die Max-2-Regel gelten nur für die Suche. Spotify gibt seit 2026 nur <strong>eigene</strong> Playlists frei — fremde vorher in Spotify als neue Playlist kopieren.
+          Deine Plattenteller-Playlists aus Spotify (nur Namen, die mit „PT“ beginnen, z. B. „PT Metal 90er“ — Ordner kann die App nicht sehen). Mit „Laden“ wird die <strong>ganze Playlist</strong> übernommen (gemischt wird erst beim Spielstart). „Anzahl Songs“ und die Max-2-Regel gelten nur für die Suche. Spotify gibt seit 2026 nur <strong>eigene</strong> Playlists frei — fremde vorher in Spotify als neue Playlist kopieren.
         </p>
         <div id="savedPlaylists"></div>
         <div id="savedPlaylistsEmpty" class="empty-note">Noch keine Playlists gemerkt. Hol sie dir direkt aus Spotify oder füge unten einen Link ein.</div>
 
-        <button class="btn-ghost btn-block" id="myPlaylistsBtn" style="margin-top:12px;">Meine Playlists aus Spotify holen</button>
+        <button class="btn-ghost btn-block" id="myPlaylistsBtn" style="margin-top:12px;">Meine „PT“-Playlists aus Spotify holen</button>
         <div id="scopeNote" class="empty-note" style="display:none;">
           Damit auch deine <strong>privaten</strong> Playlists erscheinen, braucht die App einmalig eine zusätzliche Berechtigung (kurz neu verbinden).
           <button class="btn-ghost btn-sm" id="scopeBtn" style="margin-top:8px;">Berechtigung erweitern</button>
         </div>
         <div id="myPlaylistsBox" style="display:none; margin-top:12px;">
-          <input type="text" id="myPlaylistsFilter" placeholder="Filter, z. B. Plattenteller …">
+          <input type="text" id="myPlaylistsFilter" placeholder="Filter, z. B. Rock …">
           <div id="myPlaylistsStatus" class="empty-note"></div>
           <div id="myPlaylistsList"></div>
         </div>
@@ -812,7 +815,7 @@
   // Bei jeder inhaltlichen Änderung an dieser Datei hochzählen/Datum anpassen — so lässt sich
   // auf einen Blick prüfen, ob im Browser wirklich die neueste index.html geladen wurde
   // (z.B. nach einem Cache-Refresh am Handy).
-  const APP_VERSION = '2026-10-13.3';
+  const APP_VERSION = '2026-10-13.4';
   document.querySelectorAll('.version-tag').forEach(el => { el.textContent = 'v' + APP_VERSION; });
 
   // ---------- SIMPLE PASSWORD GATE ----------
@@ -1235,6 +1238,8 @@
   const fetchStatus = document.getElementById('fetchStatus');
   const trackList = document.getElementById('trackList');
   const trackCount = document.getElementById('trackCount');
+  const trackDetails = document.getElementById('trackDetails');
+  const trackSummary = document.getElementById('trackSummary');
 
   let lastSearchQuery = '';
 
@@ -1621,6 +1626,15 @@
   const playlistListStatus = document.getElementById('playlistListStatus');
   let myPlaylists = [];
   let myUserId = null;
+  // Ordner-Ersatz: Spotify verrät der App keine Ordner. Gezeigt werden nur Playlists, deren Name mit dem Kürzel beginnt
+  // (z. B. „PT Metal 90er“) oder die #pt in der Beschreibung tragen. Das Kürzel lässt sich hier ändern.
+  const PLAYLIST_TAG = 'PT';
+  function hasPlaylistTag(p){
+    const n = String(p.name || '').trim();
+    const L = PLAYLIST_TAG.length;
+    if(n.slice(0, L).toLowerCase() === PLAYLIST_TAG.toLowerCase() && !/[a-z0-9äöüß]/i.test(n.charAt(L) || ' ')) return true;
+    return new RegExp('#' + PLAYLIST_TAG + '(?![a-z0-9äöüß])', 'i').test(p.description || '');
+  }
 
   function loadSavedPlaylists(){
     try{
@@ -1727,13 +1741,14 @@
         (d.items || []).forEach(p => {
           if(!p || !p.id) return;
           const total = p.items && p.items.total != null ? p.items.total : (p.tracks && p.tracks.total != null ? p.tracks.total : null);
-          list.push({ id: p.id, name: p.name || '(ohne Namen)', count: total, ownerId: p.owner ? p.owner.id : '', owner: p.owner ? (p.owner.display_name || p.owner.id) : '' });
+          list.push({ id: p.id, name: p.name || '(ohne Namen)', count: total, ownerId: p.owner ? p.owner.id : '', owner: p.owner ? (p.owner.display_name || p.owner.id) : '', description: p.description || '' });
         });
         url = d.next;
         guard++;
       }
       myPlaylists = list;
-      myPlaylistsStatus.textContent = list.length + (list.length === 1 ? ' Playlist' : ' Playlists') + ' gefunden.' + (hasPlaylistScope() ? '' : ' (nur öffentliche — siehe Hinweis oben)');
+      const tagged = list.filter(hasPlaylistTag).length;
+      myPlaylistsStatus.textContent = tagged + (tagged === 1 ? ' Playlist' : ' Playlists') + ' mit Kürzel „' + PLAYLIST_TAG + '“ gefunden (von ' + list.length + ' insgesamt).' + (hasPlaylistScope() ? '' : ' (nur öffentliche — siehe Hinweis oben)');
       renderMyPlaylists();
     }catch(err){
       myPlaylistsStatus.textContent = 'Fehler: ' + err.message;
@@ -1743,9 +1758,11 @@
   function renderMyPlaylists(){
     if(!myPlaylistsList) return;
     const q = myPlaylistsFilter.value.trim().toLowerCase();
-    const items = myPlaylists.filter(p => !q || p.name.toLowerCase().includes(q));
+    const tagged = myPlaylists.filter(hasPlaylistTag);
+    const items = tagged.filter(p => !q || p.name.toLowerCase().includes(q));
     myPlaylistsList.innerHTML = '';
-    if(myPlaylists.length && !items.length){ myPlaylistsList.innerHTML = '<div class="empty-note">Keine passende Playlist gefunden.</div>'; return; }
+    if(myPlaylists.length && !tagged.length){ myPlaylistsList.innerHTML = '<div class="empty-note">Keine Playlist mit dem Kürzel „' + PLAYLIST_TAG + '“ gefunden. Benenne deine Plattenteller-Playlists in Spotify so um, dass der Name mit „' + PLAYLIST_TAG + ' “ beginnt (z. B. „' + PLAYLIST_TAG + ' Metal 90er“), oder schreibe #' + PLAYLIST_TAG.toLowerCase() + ' in die Beschreibung.</div>'; return; }
+    if(tagged.length && !items.length){ myPlaylistsList.innerHTML = '<div class="empty-note">Keine passende Playlist gefunden.</div>'; return; }
     items.forEach(p => {
       const saved = allPlaylists().some(x => x.id === p.id);
       const foreign = myUserId && p.ownerId && p.ownerId !== myUserId;
@@ -2254,6 +2271,10 @@
     clearTracksBtn.style.display = tracks.length ? 'inline-block' : 'none';
     trackCount.style.display = tracks.length ? 'inline-block' : 'none';
     trackCount.textContent = tracks.length + (tracks.length===1 ? ' Song im Stapel' : ' Songs im Stapel');
+    // Songliste bleibt eingeklappt (Playlists haben oft 300+ Songs) und öffnet sich nur auf Wunsch
+    trackDetails.style.display = tracks.length ? 'block' : 'none';
+    if(!tracks.length) trackDetails.open = false;
+    trackSummary.textContent = 'Songliste öffnen (' + tracks.length + ')';
     trackList.innerHTML = '';
     tracks.forEach((t,i) => {
       const item = document.createElement('div');

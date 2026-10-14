@@ -47,6 +47,9 @@ Kernstück ist die Auswahl-Logik in `runSearch()`:
   „Anzahl Songs“ begrenzt den Import nicht. Nur doppelte Song-IDs werden entfernt; die Nicht-lateinisch-Regel (`hasNonLatinScript()`) gilt weiter. Gemischt wird beim Spielstart.
   Zufallsauswahl und Max-2-Regel gelten nur für die Suche (Genre/Freitext) und beim manuellen Hinzufügen.
 - **Songauswahl** wird im Browser gesichert (`plattenteller_tracks`) und beim Start wiederhergestellt.
+- **„Meine Playlists“ (Ordner-Ersatz, v2026-10-13.4):** Die Spotify-API liefert keine Ordner. `loadMyPlaylists()` holt alle Playlists (`/me/playlists`), angezeigt werden nur die mit dem Kürzel `PLAYLIST_TAG` (`'PT'`) am Namensanfang
+  (`hasPlaylistTag()`: „PT“ gefolgt von Nicht-Buchstabe/Ziffer, Groß/Klein egal) oder `#pt` in der `description`. Das Kürzel ist ein Namenskonvention-Ersatz — Playlists in Spotify entsprechend benennen.
+- **Songliste:** `#trackDetails` (`<details>`) ist standardmäßig zu; der Zähler `#trackCount` steht außerhalb und bleibt sichtbar. Nötig, weil importierte Playlists oft 300+ Songs haben.
 
 ## Jahre ermitteln (für Hitster)
 

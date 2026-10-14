@@ -29,6 +29,7 @@ Der Ordner `tests/` liegt **im Repo neben** `index.html` und `docs/`. Die Tests 
 | `smoke8.js` | Jahre ermitteln (MusicBrainz) |
 | `smoke11.js` | Playlist-Import: ganze Playlist, Paging, Duplikate, Filter |
 | `smoke12.js` | Runden pro Spiel, sparsames Jahre-Prüfen im Hitster-Modus |
+| `smoke14.js` | „PT“-Kürzel als Ordner-Ersatz für „Meine Playlists“, eingeklappte Songliste |
 | `smoke13.js` | Gemeinsamer Jahre-Speicher (Firebase `years/`): Treffer, Schreiben, Rückfälle ohne/mit gesperrtem Firebase |
 | `smoke9.js` | Hitster-Modus |
 | `smoke10.js` | Quiz-Modus |

@@ -17,12 +17,15 @@ function makeFetch(scopeAfterRefresh){
     if(u.startsWith('https://accounts.spotify.com/api/token')) return json({access_token:'AT', expires_in:3600, refresh_token:'RT2', scope: scopeAfterRefresh});
     if(u==='https://api.spotify.com/v1/me') return json({id:'marcel'});
     if(u.startsWith('https://api.spotify.com/v1/me/playlists')) return json({items:[
-      {id:'PL1',name:'Plattenteller Rock',items:{total:120},owner:{id:'marcel',display_name:'Marcel'}},
-      {id:'PL2',name:'Plattenteller Pop',tracks:{total:80},owner:{id:'marcel'}},
+      {id:'PL1',name:'PT Rock',items:{total:120},owner:{id:'marcel',display_name:'Marcel'}},
+      {id:'PL2',name:'PT Pop',tracks:{total:80},owner:{id:'marcel'}},
       {id:'PL3',name:'Spotify Mix',items:{total:50},owner:{id:'spotify',display_name:'Spotify'}},
-      {id:'PL4',name:'Urlaub',items:{total:10},owner:{id:'marcel'}}], next:null});
+      {id:'PL4',name:'Urlaub',items:{total:10},owner:{id:'marcel'}},
+      {id:'PL5',name:'PT Fremd',items:{total:9},owner:{id:'spotify',display_name:'Spotify'}},
+      {id:'PL6',name:'Metal 90er',description:'Meine Auswahl #pt',items:{total:30},owner:{id:'marcel'}},
+      {id:'PL7',name:'Ptolemäus Hörspiel',items:{total:5},owner:{id:'marcel'}}], next:null});
     let m;
-    if((m=u.match(/\/playlists\/(\w+)\?fields/))) return json({name: m[1]==='PL1'?'Plattenteller Rock':'Playlist '+m[1], items:{total:7}});
+    if((m=u.match(/\/playlists\/(\w+)\?fields/))) return json({name: m[1]==='PL1'?'PT Rock':'Playlist '+m[1], items:{total:7}});
     if(/\/playlists\/\w+\/items\?limit=100/.test(u)) return json({ items:[1,2,3,4,5,6].map(n=>({item:T(n)})), next:null });
     if(/\/playlists\/\w+\/items\?limit=3/.test(u)) return json({ total:120, items:[1,2,3].map(n=>({added_at:'2026-01-01T00:00:00Z', item:T(n)})) });
     if((m=u.match(/\/v1\/tracks\/(\w+)$/))) return json(T(parseInt(m[1].replace('ID',''))||1));
@@ -65,12 +68,12 @@ const store = dom => { const o={}; const ls=dom.window.localStorage; for(let i=0
   // ===== B) Meine Playlists aus Spotify =====
   $('myPlaylistsBtn').click(); await sleep(200);
   let rows=[...D.querySelectorAll('#myPlaylistsList .pl-row')];
-  ok(rows.length===4, 'Meine Playlists: 4 Einträge geladen');
+  ok(rows.length===4, 'Meine Playlists: nur die 4 mit Kürzel „PT“ / #pt (von 7 insgesamt) ('+rows.length+')');
   ok(/120 Songs/.test(rows[0].textContent) && /80 Songs/.test(rows[1].textContent), 'Songanzahl aus „items.total“ UND „tracks.total“ gelesen');
-  ok(/von Spotify/.test(rows[2].textContent), 'Fremde Playlist (Spotify) als „von Spotify“ gekennzeichnet');
+  ok(/von Spotify/.test(rows[2].textContent), 'Fremde Playlist (PT Fremd) als „von Spotify“ gekennzeichnet');
   ok(!/von /.test(rows[0].textContent), 'Eigene Playlist ohne Fremd-Hinweis');
-  $('myPlaylistsFilter').value='plattenteller'; $('myPlaylistsFilter').dispatchEvent(new w.Event('input'));
-  ok(D.querySelectorAll('#myPlaylistsList .pl-row').length===2, 'Filter „plattenteller“: nur 2 Playlists (Ordner-Ersatz)');
+  $('myPlaylistsFilter').value='rock'; $('myPlaylistsFilter').dispatchEvent(new w.Event('input'));
+  ok(D.querySelectorAll('#myPlaylistsList .pl-row').length===1, 'Filter „rock“: nur 1 Playlist');
   [...D.querySelectorAll('#myPlaylistsList .pl-row')][0].querySelectorAll('button')[1].click(); await sleep(50); // Merken
   ok(D.querySelectorAll('#savedPlaylists .pl-row').length===1, 'Merken: Playlist steht in der Liste oben');
   ok(JSON.parse(w.localStorage.getItem('plattenteller_playlists'))[0].id==='PL1', 'Merken: im Browser gespeichert');
@@ -103,7 +106,7 @@ const store = dom => { const o={}; const ls=dom.window.localStorage; for(let i=0
   // ===== F) Liste sichern / übertragen =====
   D.getElementById('exportPlaylistsBtn').click(); await sleep(60);
   const exp = D.getElementById('importPlaylistsText').value;
-  ok(/Plattenteller Rock \| https:\/\/open\.spotify\.com\/playlist\/PL1/.test(exp), 'Export: „Name | Link“ pro Zeile ('+exp.split('\n')[0]+')');
+  ok(/PT Rock \| https:\/\/open\.spotify\.com\/playlist\/PL1/.test(exp), 'Export: „Name | Link“ pro Zeile ('+exp.split('\n')[0]+')');
   D.getElementById('importPlaylistsText').value = exp + '\nPop | https://open.spotify.com/playlist/PL5\nhttps://open.spotify.com/playlist/PL6\nKaputt ohne Link';
   D.getElementById('importPlaylistsBtn').click();
   ok(D.querySelectorAll('#savedPlaylists .pl-row').length===4 && /2 hinzugefügt, 2 schon vorhanden/.test(D.getElementById('playlistListStatus').textContent), 'Import: 2 neue, 2 vorhandene erkannt, Zeile ohne Link ignoriert ('+D.getElementById('playlistListStatus').textContent+')');
