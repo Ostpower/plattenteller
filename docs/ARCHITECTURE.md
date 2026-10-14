@@ -48,7 +48,7 @@ Kernstück ist die Auswahl-Logik in `runSearch()`:
   Zufallsauswahl und Max-2-Regel gelten nur für die Suche (Genre/Freitext) und beim manuellen Hinzufügen.
 - **Songauswahl** wird im Browser gesichert (`plattenteller_tracks`) und beim Start wiederhergestellt.
 - **„Meine Playlists“ (Ordner-Ersatz, v2026-10-13.4):** Die Spotify-API liefert keine Ordner. `loadMyPlaylists()` holt alle Playlists (`/me/playlists`), angezeigt werden nur die mit dem Kürzel `PLAYLIST_TAG` (`'PT'`) am Namensanfang
-  (`hasPlaylistTag()`: „PT“ gefolgt von Nicht-Buchstabe/Ziffer, Groß/Klein egal) oder `#pt` in der `description`. Das Kürzel ist ein Namenskonvention-Ersatz — Playlists in Spotify entsprechend benennen.
+  (`hasPlaylistTag()`: „PT“ gefolgt von Nicht-Buchstabe/Ziffer, Groß/Klein egal) oder `#pt` in der `description` (beides im Live-Betrieb bestätigt, auch für private Playlists). Das Kürzel ist ein Ersatz für den Spotify-Ordner „Plattenteller“, den die API nicht liefert — Playlists in Spotify entsprechend benennen oder `#pt` in die Beschreibung schreiben.
 - **Songliste:** `#trackDetails` (`<details>`) ist standardmäßig zu; der Zähler `#trackCount` steht außerhalb und bleibt sichtbar. Nötig, weil importierte Playlists oft 300+ Songs haben.
 
 ## Jahre ermitteln (für Hitster)

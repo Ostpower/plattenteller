@@ -163,7 +163,7 @@ Behoben mit **v2026-10-13.1** (siehe unten).
 - **„Meine Playlists“ zeigt nur noch Plattenteller-Playlists:** Spotify verrät der App keine Ordner, deshalb gilt als Ersatz das Kürzel **„PT“**:
   der Playlist-Name beginnt mit „PT“ (z. B. „PT Metal 90er“, auch „pt-pop“) oder die Beschreibung enthält `#pt`. Alle anderen Playlists aus dem Konto erscheinen nicht mehr.
   Das Kürzel steht als Konstante `PLAYLIST_TAG` im Code. Ohne Treffer erklärt ein Hinweis, wie man umbenennt. Statuszeile: „N Playlists mit Kürzel „PT“ gefunden (von M insgesamt)“.
-  (Die Beschreibung wird von Spotify nicht in jeder Antwort mitgeliefert — der Name ist der verlässliche Weg.)
+  (Praxistest 14.10.: Beide Wege funktionieren, auch bei privaten Playlists; eine Playlist ohne „PT“ im Namen, aber mit `#pt` in der Beschreibung, wird gefunden.)
 - **Songliste standardmäßig eingeklappt:** „Songliste öffnen (N)“ — der Zähler „N Songs im Stapel“ bleibt sichtbar; aufgeklappt bleibt sie beim Entfernen einzelner Songs offen, nach „Alle entfernen“ ist sie wieder zu.
 - Tests: neue Reihe `tests/smoke14.js`; `smoke7.js` an die PT-Namen angepasst.
 

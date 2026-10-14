@@ -8,8 +8,8 @@ Repo: `github.com/Ostpower/plattenteller` · Live: `ostpower.github.io/plattente
 Keine feste Aufgabe offen — Marcel nennt die nächste (Wunschliste unten). **Erst prüfen, ob v2026-10-13.3 hochgeladen und die neuen Firebase-Regeln veröffentlicht sind** (siehe unten).
 
 ## Zuletzt erledigt (v2026-10-13.4): PT-Kürzel für Playlists, Songliste eingeklappt
-- „Meine Playlists“ zeigt nur Playlists mit Namensanfang **„PT“** (z. B. „PT Metal 90er“) oder `#pt` in der Beschreibung — Ordner kann die Spotify-API nicht lesen. Konstante `PLAYLIST_TAG`.
-  **Marcel muss seine Plattenteller-Playlists in Spotify entsprechend umbenennen** (sonst erscheint der Hinweis „Keine Playlist mit dem Kürzel…“).
+- „Meine Playlists“ zeigt nur Playlists mit Namensanfang **„PT“** (z. B. „PT Metal 90er“) **oder** `#pt` in der Beschreibung — Ordner kann die Spotify-API nicht lesen. Konstante `PLAYLIST_TAG`.
+  Live bestätigt am 14.10. (auch private Playlists; Beschreibung `#pt` ohne „PT“ im Namen funktioniert). Marcel kopiert seine Playlists schrittweise in den Spotify-Ordner „Plattenteller“ und kennzeichnet sie so (Stand: 4 von bald allen).
 - Songliste im Stapel ist standardmäßig zugeklappt („Songliste öffnen (N)“). Tests: `smoke14.js`.
 - Offen dazu: ob Marcel die Playlists später lieber fest einbauen will (`DEFAULT_PLAYLISTS`, gilt dann auf allen Geräten ohne „Merken“; „Merken“ gilt sonst pro Browser).
 
@@ -43,6 +43,8 @@ Neuer Chat: laut `docs/anleitung-neue-chats.md` und den Projekt-Anweisungen star
 Der lokale Ordner `Hitster-Alternative` ist ein **Git-Klon** von `Ostpower/plattenteller` (Branch `main`); Marcel nutzt GitHub Desktop.
 - **Claude** ändert, testet und pflegt Doku **nur im Ordner** (kein Git-Zugriff auf GitHub, nie selbst pushen). Danach sagt Claude „fertig“ und nennt, welche Dateien sich inhaltlich geändert haben.
 - **Marcel** prüft in GitHub Desktop (Reiter „Changes“), schreibt eine kurze Summary, „Commit to main“, dann „Push origin“. Erst nach dem Push ist `ostpower.github.io/plattenteller` aktuell — danach am Versions-Tag prüfen.
+- **Commit-Summary einheitlich:** Immer `vJJJJ-MM-TT.N – Kurztext`, die Version vorn (bei reinen Doku-Änderungen die aktuelle Version mit „Doku: …“), z. B. `v2026-10-13.4 – PT-Kürzel für Playlists, Songliste eingeklappt` oder `v2026-10-13.4 – Doku: PT-Kürzel live bestätigt`.
+  Claude nennt am Ende jeder Aufgabe den fertigen Summary-Text zum Kopieren, dazu eine kurze Beschreibung (optional) mit den wichtigsten Punkten.
 - **Nur lokal, nicht im Repo** (über `.git/info/exclude` ausgeschlossen): `CLAUDE.md`, `AGENTS.md`, `releases/`. Nicht aus dem Ausschluss nehmen und nicht committen.
 - **Zeilenenden:** Zeigt GitHub Desktop viele Dateien mit „No content changes found“, ist das nur Zeilenenden-/Dateirechte-Rauschen (Claude schreibt LF, der Ordner liegt unter Windows). Beim Commit werden sie nicht mitgenommen; im Reiter „History“ muss der neue Commit nur die tatsächlich geänderten Dateien zählen.
   Zeigt ein Commit auffällig viele Dateien, **nicht pushen**, sondern Claude fragen.
